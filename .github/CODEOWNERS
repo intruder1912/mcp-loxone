@@ -1,0 +1,21 @@
+# Code Owners for automatic review assignment
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners
+* @r
+
+# Python source files
+*.py @r
+/src/ @r
+
+# Documentation
+*.md @r
+/docs/ @r
+
+# CI/CD and configuration
+/.github/ @r
+/.*rc @r
+/.*config* @r
+Makefile @r
+pyproject.toml @r
+requirements.txt @r

@@ -224,8 +224,8 @@ class LoxoneSecrets:
             
         password = getpass.getpass("Password: ")
         if not password:
-        print("Error: Password cannot be empty")
-        sys.exit(1)
+            print("Error: Password cannot be empty")
+            sys.exit(1)
         
         # Test connection before saving
         print("\n🔌 Testing connection...")

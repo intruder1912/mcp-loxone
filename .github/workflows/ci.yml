@@ -1,0 +1,262 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+  push:
+    branches: [ main, master, develop ]
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install ruff mypy
+      
+      - name: Run Ruff linter
+        run: |
+          source .venv/bin/activate
+          ruff check src/
+      
+      - name: Run Ruff formatter check
+        run: |
+          source .venv/bin/activate
+          ruff format --check src/
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+          uv pip install mypy types-aiofiles
+      
+      - name: Run mypy
+        run: |
+          source .venv/bin/activate
+          mypy src/ --ignore-missing-imports --check-untyped-defs || true
+
+  security-check:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install security tools
+        run: |
+          uv venv
+          uv pip install bandit[toml] safety pip-audit
+      
+      - name: Run Bandit security linter
+        run: |
+          source .venv/bin/activate
+          bandit -r src/ -ll -i B101
+      
+      - name: Check for known vulnerabilities
+        run: |
+          source .venv/bin/activate
+          uv pip install -r requirements.txt
+          pip-audit || true
+      
+      - name: Check for hardcoded secrets
+        run: |
+          # Check for common patterns that might indicate credentials
+          ! grep -rE "(password|passwd|pwd|secret|api_key|apikey|token|credential)\s*=\s*[\"'][^\"']+[\"']" src/ --include="*.py" || (echo "Potential hardcoded secrets found!" && exit 1)
+          ! grep -rE "([0-9]{1,3}\.){3}[0-9]{1,3}" src/ --include="*.py" || echo "Warning: IP addresses found in code"
+          ! grep -rE "(BEGIN (RSA|DSA|EC|OPENSSH) PRIVATE KEY|BEGIN CERTIFICATE)" src/ || (echo "Private keys or certificates found!" && exit 1)
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+          uv pip install pytest pytest-asyncio pytest-cov
+      
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          # Run tests if they exist, otherwise skip
+          if [ -d "tests" ]; then
+            pytest tests/ -v --cov=src/loxone_mcp --cov-report=term-missing
+          else
+            echo "No tests directory found, skipping tests"
+          fi
+      
+      - name: Test MCP server startup
+        run: |
+          source .venv/bin/activate
+          # Just check if the server can be imported without errors
+          python -c "from loxone_mcp import mcp; print('Server module imports successfully')"
+
+  validate-mcp:
+    name: Validate MCP Implementation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+      
+      - name: Validate MCP server
+        run: |
+          source .venv/bin/activate
+          # Check if server exposes required MCP methods
+          python -c "
+from loxone_mcp.server import mcp
+import inspect
+
+print('Checking MCP server implementation...')
+
+# Get all tools
+tools = [name for name, obj in inspect.getmembers(mcp) if hasattr(obj, '__mcp_tool__')]
+print(f'Found {len(tools)} tools: {tools}')
+
+# Get all prompts  
+prompts = [name for name, obj in inspect.getmembers(mcp) if hasattr(obj, '__mcp_prompt__')]
+print(f'Found {len(prompts)} prompts: {prompts}')
+
+# Get all resources
+resources = [name for name, obj in inspect.getmembers(mcp) if hasattr(obj, '__mcp_resource__')]
+print(f'Found {len(resources)} resources: {resources}')
+
+# Basic validation
+assert len(tools) > 0, 'No MCP tools found!'
+assert len(prompts) > 0, 'No MCP prompts found!'
+print('✅ MCP server validation passed!')
+"
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Build package
+        run: |
+          uv venv
+          uv pip install build
+          source .venv/bin/activate
+          python -m build
+      
+      - name: Check package
+        run: |
+          source .venv/bin/activate
+          uv pip install twine
+          twine check dist/*
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  check-dependencies:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Check for dependency conflicts
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+          uv pip check || true
+      
+      - name: Generate dependency tree
+        run: |
+          source .venv/bin/activate
+          uv pip install pipdeptree
+          pipdeptree
