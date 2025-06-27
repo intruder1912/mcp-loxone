@@ -331,10 +331,9 @@ async fn handle_post(
             let accept_header = headers.get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
             
             // MCP Inspector expects immediate JSON responses for streamable HTTP transport
-            // If Accept header contains "application/json" but NOT "text/event-stream", 
-            // it's trying to use the new streamable HTTP transport
-            let wants_json_response = accept_header.contains("application/json") && 
-                                    !accept_header.contains("text/event-stream");
+            // Prioritize streamable HTTP when application/json is requested, regardless of other headers
+            // This fixes MCP Inspector compatibility which sends both headers
+            let wants_json_response = accept_header.contains("application/json");
             
             if wants_json_response {
                 // New Streamable HTTP transport - return response directly
@@ -414,8 +413,7 @@ async fn handle_post(
             if let Ok(error_json) = serde_json::to_string(&error_response) {
                 // Use same transport detection logic as for success responses
                 let accept_header = headers.get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
-                let wants_json_response = accept_header.contains("application/json") && 
-                                        !accept_header.contains("text/event-stream");
+                let wants_json_response = accept_header.contains("application/json");
                 
                 if wants_json_response {
                     // New Streamable HTTP transport - return error directly
