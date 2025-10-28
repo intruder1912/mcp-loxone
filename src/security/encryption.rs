@@ -4,11 +4,10 @@
 //! WebSocket message payloads in Loxone communication. It implements the encryption
 //! protocol used by Loxone Miniservers for sensitive data transmission.
 
-use aes::{
-    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
-    Aes256,
-};
+use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::Aes256;
 use base64::{engine::general_purpose, Engine as _};
+use generic_array::GenericArray;
 use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
