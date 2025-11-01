@@ -2301,7 +2301,7 @@ impl LoxoneWebSocketClient {
 
             let mut stream_guard = stream.lock().await;
             stream_guard
-                .send(Message::Text(json_payload))
+                .send(Message::Text(json_payload.into()))
                 .await
                 .map_err(|e| {
                     LoxoneError::connection(format!("Failed to send encrypted message: {e}"))
@@ -2482,7 +2482,7 @@ impl LoxoneClient for LoxoneWebSocketClient {
 
                 match stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(
-                        ws_command.clone(),
+                        ws_command.clone().into(),
                     ))
                     .await
                 {

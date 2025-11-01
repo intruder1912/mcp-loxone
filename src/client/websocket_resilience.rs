@@ -872,7 +872,7 @@ impl WebSocketResilienceManager {
         tokio::spawn(async move {
             while let Some(msg) = receiver.recv().await {
                 if let Ok(text) = serde_json::to_string(&msg) {
-                    if let Err(e) = ws_sender.send(Message::Text(text)).await {
+                    if let Err(e) = ws_sender.send(Message::Text(text.into())).await {
                         tracing::error!("Failed to send WebSocket message: {}", e);
                         break;
                     }

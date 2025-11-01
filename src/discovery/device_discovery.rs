@@ -104,7 +104,7 @@ impl DeviceDiscovery {
         });
 
         ws_sender
-            .send(Message::Text(discovery_msg.to_string()))
+            .send(Message::Text(discovery_msg.to_string().into()))
             .await?;
 
         // Collect responses for a short time
