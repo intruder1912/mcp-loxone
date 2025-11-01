@@ -15,23 +15,17 @@ use std::{env, time::Duration};
 use url::Url;
 
 /// Authentication method to use with Loxone Miniserver
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthMethod {
     /// Basic HTTP authentication (legacy, for V8 and older)
     Basic,
     /// Token-based authentication (recommended for V9+)
+    #[default]
     Token,
     /// WebSocket real-time communication (for advanced features)
     #[cfg(feature = "websocket")]
     WebSocket,
-}
-
-impl Default for AuthMethod {
-    fn default() -> Self {
-        // Default to token auth for new installations
-        Self::Token
-    }
 }
 
 /// Server configuration

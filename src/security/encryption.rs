@@ -4,6 +4,9 @@
 //! WebSocket message payloads in Loxone communication. It implements the encryption
 //! protocol used by Loxone Miniservers for sensitive data transmission.
 
+// Allow deprecated generic_array usage - required for compatibility with aes 0.8
+#![allow(deprecated)]
+
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::Aes256;
 use base64::{engine::general_purpose, Engine as _};
