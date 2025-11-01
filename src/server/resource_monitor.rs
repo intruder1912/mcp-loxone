@@ -6,7 +6,7 @@
 use crate::error::{LoxoneError, Result};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
@@ -213,7 +213,8 @@ impl ResourceMonitor {
     /// Update resource usage statistics
     async fn update_usage(&self) {
         let mut system = self.system.lock().await;
-        system.refresh_process(self.pid);
+        // Refresh only the specific process we're monitoring
+        system.refresh_processes(ProcessesToUpdate::Some(&[self.pid]), true);
 
         if let Some(process) = system.process(self.pid) {
             let mut usage = self.usage.lock().await;

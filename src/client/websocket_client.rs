@@ -1425,7 +1425,7 @@ impl LoxoneWebSocketClient {
             .append_pair("password", &credentials.password);
 
         // Attempt connection
-        let (ws_stream, response) = connect_async(&ws_url)
+        let (ws_stream, response) = connect_async(ws_url.as_str())
             .await
             .map_err(|e| LoxoneError::connection(format!("WebSocket reconnection failed: {e}")))?;
 
@@ -1478,7 +1478,7 @@ impl LoxoneWebSocketClient {
         ws_url.set_query(Some(&auth_params));
 
         // Attempt connection
-        let (ws_stream, response) = connect_async(&ws_url).await.map_err(|e| {
+        let (ws_stream, response) = connect_async(ws_url.as_str()).await.map_err(|e| {
             LoxoneError::connection(format!("WebSocket token reconnection failed: {e}"))
         })?;
 
@@ -1507,7 +1507,7 @@ impl LoxoneWebSocketClient {
             }
             Message::Binary(data) => {
                 debug!("Received binary message: {} bytes", data.len());
-                Self::handle_binary_message_static(data).await?;
+                Self::handle_binary_message_static(data.to_vec()).await?;
             }
             Message::Ping(_data) => {
                 debug!("Received ping - pong will be sent automatically by tungstenite");
@@ -2301,7 +2301,7 @@ impl LoxoneWebSocketClient {
 
             let mut stream_guard = stream.lock().await;
             stream_guard
-                .send(Message::Text(json_payload))
+                .send(Message::Text(json_payload.into()))
                 .await
                 .map_err(|e| {
                     LoxoneError::connection(format!("Failed to send encrypted message: {e}"))
@@ -2413,7 +2413,7 @@ impl LoxoneClient for LoxoneWebSocketClient {
         debug!("WebSocket URL: {}", ws_url);
 
         // Connect to WebSocket
-        let (ws_stream, response) = connect_async(&ws_url)
+        let (ws_stream, response) = connect_async(ws_url.as_str())
             .await
             .map_err(|e| LoxoneError::connection(format!("WebSocket connection failed: {e}")))?;
 
@@ -2482,7 +2482,7 @@ impl LoxoneClient for LoxoneWebSocketClient {
 
                 match stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(
-                        ws_command.clone(),
+                        ws_command.clone().into(),
                     ))
                     .await
                 {

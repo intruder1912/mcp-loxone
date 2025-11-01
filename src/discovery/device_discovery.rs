@@ -91,7 +91,7 @@ impl DeviceDiscovery {
         let ws_url = format!("ws://{}/ws/rfc6455", base_url.trim_start_matches("http://"));
         let url = Url::parse(&ws_url)?;
 
-        let (ws_stream, _) = connect_async(url).await?;
+        let (ws_stream, _) = connect_async(url.as_str()).await?;
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Send discovery request
@@ -104,7 +104,7 @@ impl DeviceDiscovery {
         });
 
         ws_sender
-            .send(Message::Text(discovery_msg.to_string()))
+            .send(Message::Text(discovery_msg.to_string().into()))
             .await?;
 
         // Collect responses for a short time

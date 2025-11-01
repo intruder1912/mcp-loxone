@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -264,7 +264,7 @@ impl MetricsCollector {
         let mut system = self.system.write().await;
         system.refresh_cpu_usage();
         system.refresh_memory();
-        system.refresh_processes();
+        system.refresh_processes(ProcessesToUpdate::All, true);
 
         // Calculate CPU usage
         let cpu_usage = system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()

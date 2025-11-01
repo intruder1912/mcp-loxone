@@ -4,11 +4,14 @@
 //! WebSocket message payloads in Loxone communication. It implements the encryption
 //! protocol used by Loxone Miniservers for sensitive data transmission.
 
+// Allow deprecated generic_array usage - required for compatibility with aes 0.8
+#![allow(deprecated)]
+
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::Aes256;
 use base64::{engine::general_purpose, Engine as _};
 use generic_array::GenericArray;
-use rand::{thread_rng, RngCore};
+use rand::{rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -115,7 +118,7 @@ impl EncryptionSession {
     /// Create a new encryption session with random key
     pub fn new(session_duration_hours: u32) -> Self {
         let mut key = [0u8; 32];
-        thread_rng().fill_bytes(&mut key);
+        rng().fill_bytes(&mut key);
 
         let now = chrono::Utc::now();
         let session_id = generate_session_id();
@@ -166,7 +169,7 @@ impl EncryptionSession {
 
         // Generate random IV
         let mut iv = [0u8; 16];
-        thread_rng().fill_bytes(&mut iv);
+        rng().fill_bytes(&mut iv);
 
         // Encrypt the message
         let encrypted_data = encrypt_aes_cbc(&self.key, &iv, plaintext)?;
@@ -343,7 +346,7 @@ pub fn decrypt_aes_cbc(
 /// Generate a secure session ID
 fn generate_session_id() -> String {
     let mut bytes = [0u8; 16];
-    thread_rng().fill_bytes(&mut bytes);
+    rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }
 
