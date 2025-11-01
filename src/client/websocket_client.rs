@@ -1425,7 +1425,7 @@ impl LoxoneWebSocketClient {
             .append_pair("password", &credentials.password);
 
         // Attempt connection
-        let (ws_stream, response) = connect_async(&ws_url)
+        let (ws_stream, response) = connect_async(ws_url.as_str())
             .await
             .map_err(|e| LoxoneError::connection(format!("WebSocket reconnection failed: {e}")))?;
 
@@ -1478,7 +1478,7 @@ impl LoxoneWebSocketClient {
         ws_url.set_query(Some(&auth_params));
 
         // Attempt connection
-        let (ws_stream, response) = connect_async(&ws_url).await.map_err(|e| {
+        let (ws_stream, response) = connect_async(ws_url.as_str()).await.map_err(|e| {
             LoxoneError::connection(format!("WebSocket token reconnection failed: {e}"))
         })?;
 
@@ -2413,7 +2413,7 @@ impl LoxoneClient for LoxoneWebSocketClient {
         debug!("WebSocket URL: {}", ws_url);
 
         // Connect to WebSocket
-        let (ws_stream, response) = connect_async(&ws_url)
+        let (ws_stream, response) = connect_async(ws_url.as_str())
             .await
             .map_err(|e| LoxoneError::connection(format!("WebSocket connection failed: {e}")))?;
 
