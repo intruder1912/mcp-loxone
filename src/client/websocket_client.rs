@@ -1507,7 +1507,7 @@ impl LoxoneWebSocketClient {
             }
             Message::Binary(data) => {
                 debug!("Received binary message: {} bytes", data.len());
-                Self::handle_binary_message_static(data).await?;
+                Self::handle_binary_message_static(data.to_vec()).await?;
             }
             Message::Ping(_data) => {
                 debug!("Received ping - pong will be sent automatically by tungstenite");
