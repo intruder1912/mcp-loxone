@@ -176,11 +176,7 @@ impl McpConfiguration for Config {
 // We'll use lazy_static or provide these at runtime
 fn get_default_server_info() -> ServerInfo {
     ServerInfo {
-        protocol_version: pulseengine_mcp_protocol::ProtocolVersion {
-            major: 0,
-            minor: 1,
-            patch: 0,
-        },
+        protocol_version: pulseengine_mcp_protocol::ProtocolVersion::new("0.1.0"),
         capabilities: ServerCapabilities {
             tools: Some(pulseengine_mcp_protocol::ToolsCapability { list_changed: None }),
             resources: Some(pulseengine_mcp_protocol::ResourcesCapability {
@@ -520,7 +516,7 @@ async fn main() -> Result<()> {
                     tracing::error!("Request handling error: {}", e);
                     pulseengine_mcp_protocol::Response {
                         jsonrpc: "2.0".to_string(),
-                        id: serde_json::Value::Null,
+                        id: None,
                         result: None,
                         error: Some(pulseengine_mcp_protocol::Error::internal_error(
                             e.to_string(),
