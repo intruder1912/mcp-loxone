@@ -1,31 +1,29 @@
 version: 2
 updates:
-  # Enable version updates for Python dependencies
-  - package-ecosystem: "pip"
+  # Enable version updates for Rust/Cargo
+  - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "03:00"
-    open-pull-requests-limit: 10
+      time: "02:00"
+    open-pull-requests-limit: 5
     reviewers:
       - "r"
     labels:
       - "dependencies"
-      - "python"
+      - "cargo"
     commit-message:
-      prefix: "chore"
+      prefix: "ci"
       include: "scope"
-    pull-request-branch-name:
-      separator: "-"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "03:00"
+      day: "tuesday"
+      time: "02:00"
     open-pull-requests-limit: 5
     reviewers:
       - "r"
