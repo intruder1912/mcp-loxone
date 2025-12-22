@@ -3,6 +3,7 @@
 //! This module contains active server components that work with the framework.
 
 pub mod framework_backend;
+pub mod macro_backend;
 // Legacy modules temporarily disabled during framework migration
 // pub mod handlers;
 pub mod health_check;
