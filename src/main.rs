@@ -1,13 +1,14 @@
-//! Loxone MCP Server - Main Entry Point using MCP Framework CLI
+//! Loxone MCP Server - Main Entry Point
 //!
-//! This uses the MCP framework's CLI features for automatic configuration
-//! and transport management.
+//! Uses pulseengine-mcp 0.17.0 framework with macros support.
 
 use pulseengine_mcp_auth::AuthenticationManager;
-use pulseengine_mcp_cli::config::{DefaultLoggingConfig, LogFormat, LogOutput};
-use pulseengine_mcp_cli::McpConfiguration;
-use pulseengine_mcp_monitoring::MetricsCollector;
-use pulseengine_mcp_protocol::{Implementation, ServerCapabilities, ServerInfo};
+use pulseengine_mcp_protocol::{
+    ElicitationCapability, FormElicitationCapability, Implementation, ProtocolVersion,
+    PromptsCapability, ResourcesCapability, SamplingCapability, SamplingContextCapability,
+    SamplingToolsCapability, ServerCapabilities, ServerInfo, ToolsCapability,
+    UrlElicitationCapability,
+};
 use pulseengine_mcp_security::SecurityMiddleware;
 use pulseengine_mcp_server::{middleware::MiddlewareStack, GenericServerHandler};
 use pulseengine_mcp_transport::{create_transport, Transport};
@@ -23,6 +24,7 @@ use loxone_mcp_rust::{
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use tracing::info;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Loxone MCP Server Configuration
 #[derive(Parser, Debug)]
@@ -53,14 +55,6 @@ struct Config {
     /// Credential ID (from loxone-mcp-auth)
     #[arg(long, global = true)]
     credential_id: Option<String>,
-
-    /// Server information (auto-populated by framework)
-    #[clap(skip)]
-    server_info: Option<ServerInfo>,
-
-    /// Logging configuration (managed by framework)
-    #[clap(skip)]
-    logging: Option<DefaultLoggingConfig>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -105,65 +99,46 @@ enum TransportCommand {
     },
 }
 
-impl McpConfiguration for Config {
-    fn initialize_logging(&self) -> std::result::Result<(), pulseengine_mcp_cli::CliError> {
-        let log_config = self.logging.as_ref().cloned().unwrap_or_else(|| {
-            DefaultLoggingConfig {
-                level: if self.debug {
-                    "debug".to_string()
-                } else {
-                    "info".to_string()
-                },
-                format: LogFormat::Compact, // Use compact format instead of pretty
-                output: LogOutput::Stdout,
-                structured: false,
-            }
-        });
+impl Config {
+    /// Initialize logging based on debug flag
+    fn initialize_logging(&self) {
+        let filter = if self.debug {
+            EnvFilter::new("debug")
+        } else {
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
+        };
 
-        log_config.initialize()
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt::layer().compact())
+            .init();
     }
 
-    fn get_server_info(&self) -> &ServerInfo {
-        static SERVER_INFO: std::sync::OnceLock<ServerInfo> = std::sync::OnceLock::new();
-        self.server_info
-            .as_ref()
-            .unwrap_or_else(|| SERVER_INFO.get_or_init(get_default_server_info))
-    }
-
-    fn get_logging_config(&self) -> &DefaultLoggingConfig {
-        static LOGGING_CONFIG: std::sync::OnceLock<DefaultLoggingConfig> =
-            std::sync::OnceLock::new();
-        self.logging
-            .as_ref()
-            .unwrap_or_else(|| LOGGING_CONFIG.get_or_init(get_default_logging_config))
-    }
-
-    fn validate(&self) -> std::result::Result<(), pulseengine_mcp_cli::CliError> {
-        // Check if we have credential ID or direct credentials
+    /// Validate configuration
+    fn validate(&self) -> Result<()> {
         let has_credential_id = self.credential_id.is_some();
         let has_direct_credentials = self.loxone_host.is_some()
             && self.loxone_user.is_some()
             && self.loxone_password.is_some();
 
-        // Validate Loxone credentials if not in offline mode
         match &self.transport {
             TransportCommand::Stdio { offline } => {
                 if !offline && !has_credential_id && !has_direct_credentials {
-                    return Err(pulseengine_mcp_cli::CliError::configuration(
+                    return Err(loxone_mcp_rust::LoxoneError::config(
                         "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --offline mode"
                     ));
                 }
             }
             TransportCommand::Http { dev_mode, .. } => {
                 if !dev_mode && !has_credential_id && !has_direct_credentials {
-                    return Err(pulseengine_mcp_cli::CliError::configuration(
+                    return Err(loxone_mcp_rust::LoxoneError::config(
                         "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --dev-mode"
                     ));
                 }
             }
             TransportCommand::StreamableHttp { .. } => {
                 if !has_credential_id && !has_direct_credentials {
-                    return Err(pulseengine_mcp_cli::CliError::configuration(
+                    return Err(loxone_mcp_rust::LoxoneError::config(
                         "Loxone credentials required. Use --credential-id <id> or set LOXONE_HOST/LOXONE_USER/LOXONE_PASS"
                     ));
                 }
@@ -173,56 +148,49 @@ impl McpConfiguration for Config {
     }
 }
 
-// We'll use lazy_static or provide these at runtime
+/// Get default server info with 0.17.0 protocol types
+#[allow(dead_code)]
 fn get_default_server_info() -> ServerInfo {
     ServerInfo {
-        protocol_version: pulseengine_mcp_protocol::ProtocolVersion::default(),
+        protocol_version: ProtocolVersion::default(),
         capabilities: ServerCapabilities {
-            tools: Some(pulseengine_mcp_protocol::ToolsCapability { list_changed: None }),
-            resources: Some(pulseengine_mcp_protocol::ResourcesCapability {
+            tools: Some(ToolsCapability { list_changed: None }),
+            resources: Some(ResourcesCapability {
                 subscribe: Some(true),
                 list_changed: None,
             }),
-            prompts: Some(pulseengine_mcp_protocol::PromptsCapability { list_changed: None }),
+            prompts: Some(PromptsCapability { list_changed: None }),
             logging: None,
-            // Enable sampling capability - allows server-initiated LLM calls
-            sampling: Some(pulseengine_mcp_protocol::SamplingCapability {}),
-            // Enable elicitation capability - allows server-initiated user input requests
-            elicitation: Some(pulseengine_mcp_protocol::ElicitationCapability {}),
+            sampling: Some(SamplingCapability {
+                context: Some(SamplingContextCapability {}),
+                tools: Some(SamplingToolsCapability {}),
+            }),
+            elicitation: Some(ElicitationCapability {
+                form: Some(FormElicitationCapability {}),
+                url: Some(UrlElicitationCapability {}),
+            }),
+            tasks: None,
         },
         server_info: Implementation {
             name: env!("CARGO_PKG_NAME").to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            description: Some("Loxone home automation MCP server".to_string()),
         },
         instructions: None,
     }
 }
 
-// We'll provide this at runtime
-fn get_default_logging_config() -> DefaultLoggingConfig {
-    DefaultLoggingConfig {
-        level: "info".to_string(),
-        format: LogFormat::Compact, // Use compact format instead of pretty
-        output: LogOutput::Stdout,
-        structured: false,
-    }
-}
-
 /// Load credentials from credential ID
 async fn load_credentials_by_id(credential_id: &str) -> Result<(String, String, String)> {
-    // Load registry
     let registry = CredentialRegistry::load()?;
 
-    // Find credential by ID
-    let stored = registry.get_credential(credential_id)
-        .ok_or_else(|| loxone_mcp_rust::LoxoneError::config(
-            format!("Credential ID '{credential_id}' not found. Use 'loxone-mcp-auth list' to see available credentials")
-        ))?;
+    let stored = registry.get_credential(credential_id).ok_or_else(|| {
+        loxone_mcp_rust::LoxoneError::config(format!(
+            "Credential ID '{credential_id}' not found. Use 'loxone-mcp-auth list' to see available credentials"
+        ))
+    })?;
 
-    // Load actual credentials from storage
     let manager = create_best_credential_manager().await?;
-
-    // Set host for retrieval (the credential manager needs this)
     std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port));
 
     let credentials = manager.get_credentials().await.map_err(|e| {
@@ -237,13 +205,9 @@ async fn load_credentials_by_id(credential_id: &str) -> Result<(String, String, 
 
 /// Try to auto-detect credentials from available credential managers
 async fn try_auto_detect_credentials() -> Result<(String, String, String)> {
-    // Create best available credential manager
     let manager = create_best_credential_manager().await?;
-
-    // Try to get credentials
     let credentials = manager.get_credentials().await?;
 
-    // Get host from environment variable
     let host = std::env::var("LOXONE_HOST").map_err(|_| {
         loxone_mcp_rust::LoxoneError::config("LOXONE_HOST environment variable not set".to_string())
     })?;
@@ -253,53 +217,43 @@ async fn try_auto_detect_credentials() -> Result<(String, String, String)> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Parse CLI arguments using framework
     let config = Config::parse();
 
-    // Initialize logging through framework
-    config
-        .initialize_logging()
-        .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
+    // Initialize logging
+    config.initialize_logging();
 
     // Validate configuration
-    config
-        .validate()
-        .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
+    config.validate()?;
 
     info!(
         "🚀 Starting Loxone MCP Server v{}",
         env!("CARGO_PKG_VERSION")
     );
 
-    // Load credentials with clear precedence order:
-    // 1. Credential ID (if provided)
-    // 2. Direct CLI arguments / environment variables
-    // 3. Auto-detect from credential manager (fallback)
-    let (loxone_host, loxone_user, _loxone_password) = if let Some(credential_id) =
-        &config.credential_id
-    {
-        info!("🔑 Loading credentials from ID: {}", credential_id);
-        load_credentials_by_id(credential_id).await?
-    } else if config.loxone_host.is_some()
-        && config.loxone_user.is_some()
-        && config.loxone_password.is_some()
-    {
-        info!("🔑 Using direct CLI credentials");
-        (
-            config.loxone_host.clone().unwrap(),
-            config.loxone_user.clone().unwrap(),
-            config.loxone_password.clone().unwrap(),
-        )
-    } else {
-        // Try to auto-detect credentials from best available backend
-        info!("🔍 Auto-detecting credentials from available backends...");
-        match try_auto_detect_credentials().await {
-            Ok((host, user, pass)) => {
-                info!("✅ Auto-detected credentials from credential manager");
-                (host, user, pass)
-            }
-            Err(e) => {
-                return Err(loxone_mcp_rust::LoxoneError::config(format!(
+    // Load credentials with precedence: credential_id > direct args > auto-detect
+    let (loxone_host, loxone_user, _loxone_password) =
+        if let Some(credential_id) = &config.credential_id {
+            info!("🔑 Loading credentials from ID: {}", credential_id);
+            load_credentials_by_id(credential_id).await?
+        } else if config.loxone_host.is_some()
+            && config.loxone_user.is_some()
+            && config.loxone_password.is_some()
+        {
+            info!("🔑 Using direct CLI credentials");
+            (
+                config.loxone_host.clone().unwrap(),
+                config.loxone_user.clone().unwrap(),
+                config.loxone_password.clone().unwrap(),
+            )
+        } else {
+            info!("🔍 Auto-detecting credentials from available backends...");
+            match try_auto_detect_credentials().await {
+                Ok((host, user, pass)) => {
+                    info!("✅ Auto-detected credentials from credential manager");
+                    (host, user, pass)
+                }
+                Err(e) => {
+                    return Err(loxone_mcp_rust::LoxoneError::config(format!(
                         "No credentials available. Please either:\n\
                          1. Use --credential-id <id> (run 'loxone-mcp-auth list' to see available IDs)\n\
                          2. Set --loxone-host, --loxone-user, --loxone-password\n\
@@ -308,9 +262,9 @@ async fn main() -> Result<()> {
                          \n\
                          Error details: {e}"
                     )));
+                }
             }
-        }
-    };
+        };
 
     // Create Loxone configuration
     let loxone_config = match &config.transport {
@@ -319,18 +273,14 @@ async fn main() -> Result<()> {
                 info!("Running in offline mode - no Loxone connection");
                 LoxoneServerConfig::offline_mode()
             } else {
-                {
-                    let mut server_config = LoxoneServerConfig::default();
-                    server_config.loxone.url =
-                        format!("http://{loxone_host}").parse().map_err(|e| {
-                            loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
-                        })?;
-                    server_config.loxone.username = loxone_user.clone();
-                    server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                    server_config.loxone.verify_ssl = false;
-                    // Let the adaptive client factory handle auth method selection based on server capabilities
-                    server_config
-                }
+                let mut server_config = LoxoneServerConfig::default();
+                server_config.loxone.url = format!("http://{loxone_host}")
+                    .parse()
+                    .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
+                server_config.loxone.username = loxone_user.clone();
+                server_config.loxone.timeout = std::time::Duration::from_secs(30);
+                server_config.loxone.verify_ssl = false;
+                server_config
             }
         }
         TransportCommand::Http { dev_mode, .. } => {
@@ -338,18 +288,14 @@ async fn main() -> Result<()> {
                 info!("Running in development mode - minimal configuration");
                 LoxoneServerConfig::dev_mode()
             } else {
-                {
-                    let mut server_config = LoxoneServerConfig::default();
-                    server_config.loxone.url =
-                        format!("http://{loxone_host}").parse().map_err(|e| {
-                            loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
-                        })?;
-                    server_config.loxone.username = loxone_user.clone();
-                    server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                    server_config.loxone.verify_ssl = false;
-                    // Let the adaptive client factory handle auth method selection based on server capabilities
-                    server_config
-                }
+                let mut server_config = LoxoneServerConfig::default();
+                server_config.loxone.url = format!("http://{loxone_host}")
+                    .parse()
+                    .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
+                server_config.loxone.username = loxone_user.clone();
+                server_config.loxone.timeout = std::time::Duration::from_secs(30);
+                server_config.loxone.verify_ssl = false;
+                server_config
             }
         }
         TransportCommand::StreamableHttp { .. } => {
@@ -364,47 +310,34 @@ async fn main() -> Result<()> {
         }
     };
 
-    // Create framework authentication manager for HTTP transport
-    let framework_auth_manager = match &config.transport {
-        TransportCommand::Http { dev_mode, .. } if !dev_mode => {
-            // Create minimal framework auth configuration
-            let auth_config = pulseengine_mcp_auth::AuthConfig {
+    // Create framework authentication manager
+    let framework_auth_manager = {
+        let auth_config = match &config.transport {
+            TransportCommand::Http { dev_mode, .. } if !dev_mode => pulseengine_mcp_auth::AuthConfig {
                 enabled: true,
                 ..Default::default()
-            };
-
-            let auth_manager = AuthenticationManager::new(auth_config)
-                .await
-                .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
-
-            info!("✅ Framework authentication initialized");
-            Some(Arc::new(auth_manager))
-        }
-        _ => {
-            // Create minimal auth manager for other transports
-            let auth_config = pulseengine_mcp_auth::AuthConfig {
+            },
+            _ => pulseengine_mcp_auth::AuthConfig {
                 enabled: false,
                 ..Default::default()
-            };
+            },
+        };
 
-            let auth_manager = AuthenticationManager::new(auth_config)
-                .await
-                .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
+        let auth_manager = AuthenticationManager::new(auth_config)
+            .await
+            .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
 
-            Some(Arc::new(auth_manager))
-        }
+        info!("✅ Framework authentication initialized");
+        Arc::new(auth_manager)
     };
 
     // Create Loxone framework backend
     let backend = create_loxone_backend(loxone_config).await?;
     info!("✅ Loxone framework backend initialized");
 
-    // Create middleware stack based on transport
+    // Create middleware stack based on transport (without monitoring - dropped in 0.17.0 upgrade)
     let middleware = match &config.transport {
-        TransportCommand::Stdio { .. } => {
-            // Minimal middleware for stdio
-            MiddlewareStack::new()
-        }
+        TransportCommand::Stdio { .. } => MiddlewareStack::new(),
         TransportCommand::Http { api_key, .. } => {
             let mut stack = MiddlewareStack::new();
 
@@ -412,59 +345,35 @@ async fn main() -> Result<()> {
             let security_config = pulseengine_mcp_security::SecurityConfig::default();
             stack = stack.with_security(SecurityMiddleware::new(security_config));
 
-            // Add auth middleware if framework auth was created
-            if let Some(ref auth_manager) = framework_auth_manager {
-                // Configure API key if provided
-                if let Some(key) = api_key {
-                    if key.len() < 32 {
-                        return Err(loxone_mcp_rust::LoxoneError::config(
-                            "API key must be at least 32 characters for security",
-                        ));
-                    }
-
-                    info!(
-                        "API key provided for HTTP authentication (key length: {} chars)",
-                        key.len()
-                    );
+            // Add auth middleware
+            if let Some(key) = api_key {
+                if key.len() < 32 {
+                    return Err(loxone_mcp_rust::LoxoneError::config(
+                        "API key must be at least 32 characters for security",
+                    ));
                 }
-
-                // Add framework auth to middleware stack
-                stack = stack.with_auth(auth_manager.clone());
-                info!("Framework authentication middleware added");
-            } else {
-                info!("Development mode - authentication disabled");
+                info!(
+                    "API key provided for HTTP authentication (key length: {} chars)",
+                    key.len()
+                );
             }
-
-            // Add monitoring
-            let monitoring_config = pulseengine_mcp_monitoring::MonitoringConfig::default();
-            let metrics_collector = Arc::new(MetricsCollector::new(monitoring_config));
-            stack = stack.with_monitoring(metrics_collector);
+            stack = stack.with_auth(framework_auth_manager.clone());
+            info!("Framework authentication middleware added");
 
             stack
         }
         TransportCommand::StreamableHttp { .. } => {
-            // Full middleware stack for streamable HTTP
             let mut stack = MiddlewareStack::new();
-
-            // Security
             let security_config = pulseengine_mcp_security::SecurityConfig::default();
             stack = stack.with_security(SecurityMiddleware::new(security_config));
-
-            // Monitoring
-            let monitoring_config = pulseengine_mcp_monitoring::MonitoringConfig::default();
-            let metrics_collector = Arc::new(MetricsCollector::new(monitoring_config));
-            stack = stack.with_monitoring(metrics_collector);
-
             stack
         }
     };
 
     // Create generic handler with middleware
-    let final_auth_manager =
-        framework_auth_manager.expect("Framework auth manager should be initialized");
-    let handler = GenericServerHandler::new(backend, final_auth_manager, middleware);
+    let handler = GenericServerHandler::new(backend, framework_auth_manager.clone(), middleware);
 
-    // Create and configure transport based on command
+    // Create and configure transport
     let mut transport: Box<dyn Transport> = match &config.transport {
         TransportCommand::Stdio { .. } => {
             info!("Starting stdio transport for Claude Desktop");
@@ -483,11 +392,9 @@ async fn main() -> Result<()> {
                 info!("Starting HTTP transport on port {}", port);
             }
 
-            // Use framework's HTTP transport which supports both SSE and streamable modes
             let http_transport = pulseengine_mcp_transport::http::HttpTransport::new(*port);
 
             if *enable_cors {
-                // Framework's HTTP transport has built-in CORS support
                 info!("CORS enabled for HTTP transport");
             }
 
@@ -500,7 +407,6 @@ async fn main() -> Result<()> {
                 info!("CORS enabled for Streamable HTTP transport");
             }
 
-            // Use framework's create_transport function for consistency
             create_transport(pulseengine_mcp_transport::TransportConfig::StreamableHttp {
                 port: *port,
                 host: None,
@@ -518,11 +424,9 @@ async fn main() -> Result<()> {
                     tracing::error!("Request handling error: {}", e);
                     pulseengine_mcp_protocol::Response {
                         jsonrpc: "2.0".to_string(),
-                        id: None, // v0.13.0: id is now Option<NumberOrString>
+                        id: None,
                         result: None,
-                        error: Some(pulseengine_mcp_protocol::Error::internal_error(
-                            e.to_string(),
-                        )),
+                        error: Some(pulseengine_mcp_protocol::Error::internal_error(e.to_string())),
                     }
                 })
             })
@@ -535,24 +439,14 @@ async fn main() -> Result<()> {
     // Handle shutdown based on transport type
     match config.transport {
         TransportCommand::Stdio { .. } => {
-            // Stdio runs until input closes
             info!("Server running. Will exit when stdin closes.");
-            // The transport handles the lifecycle
         }
         _ => {
-            // HTTP transports need to wait for shutdown signal
             info!("Server running. Press Ctrl+C to stop.");
-            tokio::signal::ctrl_c().await.map_err(|e| {
-                loxone_mcp_rust::LoxoneError::connection(format!(
-                    "Failed to listen for shutdown signal: {e}"
-                ))
-            })?;
-
-            info!("👋 Shutdown signal received, stopping server...");
-            transport
-                .stop()
+            tokio::signal::ctrl_c()
                 .await
                 .map_err(|e| loxone_mcp_rust::LoxoneError::connection(e.to_string()))?;
+            info!("Shutting down...");
         }
     }
 

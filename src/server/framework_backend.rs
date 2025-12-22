@@ -86,13 +86,22 @@ impl McpBackend for LoxoneFrameworkBackend {
                     list_changed: Some(false),
                 }),
                 // Enable sampling capability - allows server-initiated LLM calls
-                sampling: Some(pulseengine_mcp_protocol::SamplingCapability {}),
+                sampling: Some(pulseengine_mcp_protocol::SamplingCapability {
+                    context: Some(pulseengine_mcp_protocol::SamplingContextCapability {}),
+                    tools: Some(pulseengine_mcp_protocol::SamplingToolsCapability {}),
+                }),
                 // Enable elicitation capability - allows server-initiated user input requests
-                elicitation: Some(pulseengine_mcp_protocol::ElicitationCapability {}),
+                elicitation: Some(pulseengine_mcp_protocol::ElicitationCapability {
+                    form: Some(pulseengine_mcp_protocol::FormElicitationCapability {}),
+                    url: Some(pulseengine_mcp_protocol::UrlElicitationCapability {}),
+                }),
+                // Tasks capability for background task management
+                tasks: None,
             },
             server_info: Implementation {
                 name: "loxone-mcp-rust".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
+                description: Some("Loxone home automation MCP server".to_string()),
             },
             instructions: None,
         }
