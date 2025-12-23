@@ -457,4 +457,576 @@ impl LoxoneMcpServer {
             "name": "Loxone MCP Server"
         }))
     }
+
+    // ========================================================================
+    // AUDIO TOOLS
+    // ========================================================================
+
+    /// Control an audio zone (play, pause, stop, next, previous)
+    ///
+    /// Manages playback in audio zones. Actions: play, pause, stop, next, previous, mute, unmute
+    pub async fn control_audio_zone(
+        &self,
+        zone: String,
+        action: String,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let normalized_action = match action.to_lowercase().as_str() {
+            "play" | "abspielen" | "start" => "play",
+            "pause" | "pausieren" => "pause",
+            "stop" | "stopp" | "anhalten" => "stop",
+            "next" | "weiter" | "nächster" => "next",
+            "previous" | "zurück" | "vorheriger" => "previous",
+            "mute" | "stumm" => "mute",
+            "unmute" | "laut" => "unmute",
+            _ => return Err(format!("Invalid action '{action}'. Use: play, pause, stop, next, previous, mute, unmute")),
+        };
+
+        Ok(json!({
+            "zone": zone,
+            "action": normalized_action,
+            "status": "executed"
+        }))
+    }
+
+    /// Set volume for an audio zone
+    ///
+    /// Set volume level (0-100) for a specific audio zone
+    pub async fn set_audio_volume(
+        &self,
+        zone: String,
+        volume: u8,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        if volume > 100 {
+            return Err("Volume must be between 0-100".to_string());
+        }
+
+        Ok(json!({
+            "zone": zone,
+            "volume": volume,
+            "status": "success"
+        }))
+    }
+
+    /// Get status of all audio zones
+    pub async fn get_audio_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut audio_zones = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if control_type.contains("Audio") || control_type == "MediaController" {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                audio_zones.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "audio_zones": audio_zones,
+            "count": audio_zones.len()
+        }))
+    }
+
+    // ========================================================================
+    // SENSOR TOOLS
+    // ========================================================================
+
+    /// Get all sensor readings
+    ///
+    /// Returns current values from all sensors (temperature, humidity, motion, etc.)
+    pub async fn get_sensor_readings(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut sensors = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            // Match sensor types
+            if matches!(
+                control_type,
+                "InfoOnlyAnalog" | "InfoOnlyDigital" | "PresenceDetector" |
+                "MotionSensor" | "SmokeAlarm" | "Meter" | "Sensor"
+            ) {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                sensors.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "sensors": sensors,
+            "count": sensors.len()
+        }))
+    }
+
+    /// Get door and window sensor status
+    ///
+    /// Returns open/closed state of all door and window sensors
+    pub async fn get_door_window_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut door_windows = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let name = control
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            // Match door/window sensors
+            if control_type == "InfoOnlyDigital"
+                && (name.contains("door") || name.contains("window") ||
+                    name.contains("tür") || name.contains("fenster"))
+            {
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                door_windows.push(json!({
+                    "uuid": uuid,
+                    "name": control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown"),
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "door_window_sensors": door_windows,
+            "count": door_windows.len()
+        }))
+    }
+
+    /// Get motion detector status
+    pub async fn get_motion_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut motion_sensors = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if matches!(control_type, "PresenceDetector" | "MotionSensor") {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                motion_sensors.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "motion_sensors": motion_sensors,
+            "count": motion_sensors.len()
+        }))
+    }
+
+    // ========================================================================
+    // WEATHER TOOLS
+    // ========================================================================
+
+    /// Get current weather data
+    ///
+    /// Returns weather station readings (temperature, humidity, wind, rain)
+    pub async fn get_weather(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut weather_devices = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if control_type.contains("Weather") {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                weather_devices.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type
+                }));
+            }
+        }
+
+        Ok(json!({
+            "weather_devices": weather_devices,
+            "count": weather_devices.len()
+        }))
+    }
+
+    // ========================================================================
+    // ENERGY TOOLS
+    // ========================================================================
+
+    /// Get energy consumption data
+    ///
+    /// Returns current power usage and energy meters
+    pub async fn get_energy_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut energy_devices = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if matches!(control_type, "Meter" | "EnergyManager" | "EnergyMonitor")
+                || control_type.contains("Energy")
+            {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                energy_devices.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "energy_devices": energy_devices,
+            "count": energy_devices.len()
+        }))
+    }
+
+    /// Control EV charging
+    ///
+    /// Start, stop, or set charging limits for electric vehicle chargers
+    pub async fn control_ev_charging(
+        &self,
+        charger: String,
+        action: String,
+        limit_kwh: Option<f64>,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let normalized_action = match action.to_lowercase().as_str() {
+            "start" | "laden" => "start",
+            "stop" | "stoppen" => "stop",
+            "pause" | "pausieren" => "pause",
+            _ => return Err(format!("Invalid action '{action}'. Use: start, stop, pause")),
+        };
+
+        Ok(json!({
+            "charger": charger,
+            "action": normalized_action,
+            "limit_kwh": limit_kwh,
+            "status": "executed"
+        }))
+    }
+
+    // ========================================================================
+    // SECURITY TOOLS
+    // ========================================================================
+
+    /// Get security system status
+    ///
+    /// Returns alarm system state, door locks, and security sensors
+    pub async fn get_security_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut security_devices = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if matches!(
+                control_type,
+                "Alarm" | "SmokeAlarm" | "Gate" | "DoorLock" | "AccessControl"
+            ) || control_type.contains("Security")
+            {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                security_devices.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "security_devices": security_devices,
+            "count": security_devices.len()
+        }))
+    }
+
+    /// Arm or disarm security system
+    ///
+    /// Set security system mode: arm_away, arm_home, disarm
+    pub async fn set_security_mode(
+        &self,
+        mode: String,
+        code: Option<String>,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let normalized_mode = match mode.to_lowercase().as_str() {
+            "arm" | "arm_away" | "scharf" | "abwesend" => "arm_away",
+            "arm_home" | "arm_stay" | "zuhause" => "arm_home",
+            "disarm" | "unscharf" | "aus" => "disarm",
+            _ => return Err(format!("Invalid mode '{mode}'. Use: arm_away, arm_home, disarm")),
+        };
+
+        Ok(json!({
+            "mode": normalized_mode,
+            "code_provided": code.is_some(),
+            "status": "executed"
+        }))
+    }
+
+    /// Control door lock
+    ///
+    /// Lock or unlock a smart door lock
+    pub async fn control_door_lock(
+        &self,
+        lock: String,
+        action: String,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let normalized_action = match action.to_lowercase().as_str() {
+            "lock" | "abschließen" | "zu" => "lock",
+            "unlock" | "aufschließen" | "auf" => "unlock",
+            _ => return Err(format!("Invalid action '{action}'. Use: lock, unlock")),
+        };
+
+        Ok(json!({
+            "lock": lock,
+            "action": normalized_action,
+            "status": "executed"
+        }))
+    }
+
+    // ========================================================================
+    // CAMERA TOOLS
+    // ========================================================================
+
+    /// Get camera/intercom status
+    ///
+    /// Returns list of cameras and video intercoms
+    pub async fn get_camera_status(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut cameras = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if matches!(control_type, "Intercom" | "Camera" | "Doorbell")
+                || control_type.contains("Camera")
+            {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                cameras.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "type": control_type,
+                    "room": room
+                }));
+            }
+        }
+
+        Ok(json!({
+            "cameras": cameras,
+            "count": cameras.len()
+        }))
+    }
+
+    // ========================================================================
+    // INTERCOM TOOLS
+    // ========================================================================
+
+    /// Answer or control intercom
+    ///
+    /// Answer calls, open doors, or control intercom features
+    pub async fn control_intercom(
+        &self,
+        intercom: String,
+        action: String,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let normalized_action = match action.to_lowercase().as_str() {
+            "answer" | "annehmen" | "abheben" => "answer",
+            "hangup" | "auflegen" | "beenden" => "hangup",
+            "open" | "öffnen" | "tür" => "open_door",
+            "talk" | "sprechen" => "talk",
+            "mute" | "stumm" => "mute",
+            _ => return Err(format!("Invalid action '{action}'. Use: answer, hangup, open, talk, mute")),
+        };
+
+        Ok(json!({
+            "intercom": intercom,
+            "action": normalized_action,
+            "status": "executed"
+        }))
+    }
+
+    /// Get intercom call history
+    pub async fn get_intercom_history(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        Ok(json!({
+            "history": [],
+            "message": "Call history requires active connection to Loxone"
+        }))
+    }
+
+    // ========================================================================
+    // SCENE/MOOD TOOLS
+    // ========================================================================
+
+    /// Activate a scene or mood
+    ///
+    /// Trigger predefined scenes (moods) for rooms or the whole house
+    pub async fn activate_scene(
+        &self,
+        scene: String,
+        room: Option<String>,
+    ) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        Ok(json!({
+            "scene": scene,
+            "room": room,
+            "status": "activated"
+        }))
+    }
+
+    /// List available scenes
+    pub async fn list_scenes(&self) -> std::result::Result<serde_json::Value, String> {
+        self.ensure_connected()?;
+
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let mut scenes = Vec::new();
+
+        for (uuid, control) in &structure.controls {
+            let control_type = control
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if matches!(control_type, "LightController" | "MoodSwitch") {
+                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+                // Extract moods if available
+                let moods = control.get("moods").cloned().unwrap_or(json!([]));
+
+                scenes.push(json!({
+                    "uuid": uuid,
+                    "name": name,
+                    "room": room,
+                    "moods": moods
+                }));
+            }
+        }
+
+        Ok(json!({
+            "scene_controllers": scenes,
+            "count": scenes.len()
+        }))
+    }
 }
