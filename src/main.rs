@@ -270,12 +270,66 @@ async fn main() -> Result<()> {
             }
         };
 
-    // For stdio offline mode, use the simplified macro-based server
-    if let TransportCommand::Stdio { offline: true } = &config.transport {
-        info!("🚀 Starting macro-based MCP server in offline mode");
+    // For ALL stdio modes, use the macro-based server
+    if let TransportCommand::Stdio { offline } = &config.transport {
         LoxoneMcpServer::configure_stdio_logging();
 
-        let server = LoxoneMcpServer::with_defaults();
+        let server = if *offline {
+            info!("🚀 Starting macro-based MCP server in offline mode");
+            LoxoneMcpServer::with_defaults()
+        } else {
+            info!("🚀 Starting macro-based MCP server with Loxone connection");
+
+            // Create Loxone client for online mode
+            use loxone_mcp_rust::client::{ClientContext, LoxoneHttpClient};
+            use loxone_mcp_rust::config::credentials::LoxoneCredentials;
+            use loxone_mcp_rust::services::SensorTypeRegistry;
+
+            let loxone_url: url::Url = format!("http://{loxone_host}")
+                .parse()
+                .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
+
+            let loxone_cfg = loxone_mcp_rust::config::LoxoneConfig {
+                url: loxone_url,
+                timeout: std::time::Duration::from_secs(30),
+                verify_ssl: false,
+                ..Default::default()
+            };
+
+            let credentials = LoxoneCredentials {
+                username: loxone_user.clone(),
+                password: _loxone_password.clone(),
+                api_key: None,
+                #[cfg(feature = "crypto-openssl")]
+                public_key: None,
+            };
+
+            let client = LoxoneHttpClient::new(loxone_cfg, credentials)
+                .await
+                .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Failed to create client: {e}")))?;
+
+            // Get context from the client before wrapping in Arc
+            let context = Arc::new(ClientContext::new());
+            let client_arc: Arc<dyn loxone_mcp_rust::client::LoxoneClient> = Arc::new(client);
+
+            // Create value resolver with required dependencies
+            let sensor_registry = Arc::new(SensorTypeRegistry::new());
+            let value_resolver = Arc::new(loxone_mcp_rust::services::UnifiedValueResolver::new(
+                client_arc.clone(),
+                sensor_registry,
+            ));
+
+            info!("✅ Loxone client connected");
+
+            LoxoneMcpServer::with_context(
+                client_arc,
+                context,
+                value_resolver,
+                None, // state_manager
+                LoxoneServerConfig::default(),
+            )
+        };
+
         let mut mcp_server = server.serve_stdio().await
             .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}")))?;
 
