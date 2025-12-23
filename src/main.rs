@@ -8,8 +8,8 @@
 
 use pulseengine_mcp_auth::AuthenticationManager;
 use pulseengine_mcp_protocol::{
-    ElicitationCapability, FormElicitationCapability, Implementation, ProtocolVersion,
-    PromptsCapability, ResourcesCapability, SamplingCapability, SamplingContextCapability,
+    ElicitationCapability, FormElicitationCapability, Implementation, PromptsCapability,
+    ProtocolVersion, ResourcesCapability, SamplingCapability, SamplingContextCapability,
     SamplingToolsCapability, ServerCapabilities, ServerInfo, ToolsCapability,
     UrlElicitationCapability,
 };
@@ -235,29 +235,30 @@ async fn main() -> Result<()> {
     );
 
     // Load credentials with precedence: credential_id > direct args > auto-detect
-    let (loxone_host, loxone_user, _loxone_password) =
-        if let Some(credential_id) = &config.credential_id {
-            info!("🔑 Loading credentials from ID: {}", credential_id);
-            load_credentials_by_id(credential_id).await?
-        } else if config.loxone_host.is_some()
-            && config.loxone_user.is_some()
-            && config.loxone_password.is_some()
-        {
-            info!("🔑 Using direct CLI credentials");
-            (
-                config.loxone_host.clone().unwrap(),
-                config.loxone_user.clone().unwrap(),
-                config.loxone_password.clone().unwrap(),
-            )
-        } else {
-            info!("🔍 Auto-detecting credentials from available backends...");
-            match try_auto_detect_credentials().await {
-                Ok((host, user, pass)) => {
-                    info!("✅ Auto-detected credentials from credential manager");
-                    (host, user, pass)
-                }
-                Err(e) => {
-                    return Err(loxone_mcp_rust::LoxoneError::config(format!(
+    let (loxone_host, loxone_user, _loxone_password) = if let Some(credential_id) =
+        &config.credential_id
+    {
+        info!("🔑 Loading credentials from ID: {}", credential_id);
+        load_credentials_by_id(credential_id).await?
+    } else if config.loxone_host.is_some()
+        && config.loxone_user.is_some()
+        && config.loxone_password.is_some()
+    {
+        info!("🔑 Using direct CLI credentials");
+        (
+            config.loxone_host.clone().unwrap(),
+            config.loxone_user.clone().unwrap(),
+            config.loxone_password.clone().unwrap(),
+        )
+    } else {
+        info!("🔍 Auto-detecting credentials from available backends...");
+        match try_auto_detect_credentials().await {
+            Ok((host, user, pass)) => {
+                info!("✅ Auto-detected credentials from credential manager");
+                (host, user, pass)
+            }
+            Err(e) => {
+                return Err(loxone_mcp_rust::LoxoneError::config(format!(
                         "No credentials available. Please either:\n\
                          1. Use --credential-id <id> (run 'loxone-mcp-auth list' to see available IDs)\n\
                          2. Set --loxone-host, --loxone-user, --loxone-password\n\
@@ -266,9 +267,9 @@ async fn main() -> Result<()> {
                          \n\
                          Error details: {e}"
                     )));
-                }
             }
-        };
+        }
+    };
 
     // For ALL stdio modes, use the macro-based server
     if let TransportCommand::Stdio { offline } = &config.transport {
@@ -306,7 +307,11 @@ async fn main() -> Result<()> {
 
             let client = LoxoneHttpClient::new(loxone_cfg, credentials)
                 .await
-                .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Failed to create client: {e}")))?;
+                .map_err(|e| {
+                    loxone_mcp_rust::LoxoneError::connection(format!(
+                        "Failed to create client: {e}"
+                    ))
+                })?;
 
             // Get context from the client before wrapping in Arc
             let context = Arc::new(ClientContext::new());
@@ -330,11 +335,14 @@ async fn main() -> Result<()> {
             )
         };
 
-        let mut mcp_server = server.serve_stdio().await
-            .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}")))?;
+        let mut mcp_server = server.serve_stdio().await.map_err(|e| {
+            loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}"))
+        })?;
 
         info!("✅ Macro-based server started successfully");
-        mcp_server.run().await
+        mcp_server
+            .run()
+            .await
             .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}")))?;
 
         return Ok(());
@@ -349,9 +357,10 @@ async fn main() -> Result<()> {
                 LoxoneServerConfig::offline_mode()
             } else {
                 let mut server_config = LoxoneServerConfig::default();
-                server_config.loxone.url = format!("http://{loxone_host}")
-                    .parse()
-                    .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
+                server_config.loxone.url =
+                    format!("http://{loxone_host}").parse().map_err(|e| {
+                        loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
+                    })?;
                 server_config.loxone.username = loxone_user.clone();
                 server_config.loxone.timeout = std::time::Duration::from_secs(30);
                 server_config.loxone.verify_ssl = false;
@@ -364,9 +373,10 @@ async fn main() -> Result<()> {
                 LoxoneServerConfig::dev_mode()
             } else {
                 let mut server_config = LoxoneServerConfig::default();
-                server_config.loxone.url = format!("http://{loxone_host}")
-                    .parse()
-                    .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
+                server_config.loxone.url =
+                    format!("http://{loxone_host}").parse().map_err(|e| {
+                        loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
+                    })?;
                 server_config.loxone.username = loxone_user.clone();
                 server_config.loxone.timeout = std::time::Duration::from_secs(30);
                 server_config.loxone.verify_ssl = false;
@@ -388,10 +398,12 @@ async fn main() -> Result<()> {
     // Create framework authentication manager
     let framework_auth_manager = {
         let auth_config = match &config.transport {
-            TransportCommand::Http { dev_mode, .. } if !dev_mode => pulseengine_mcp_auth::AuthConfig {
-                enabled: true,
-                ..Default::default()
-            },
+            TransportCommand::Http { dev_mode, .. } if !dev_mode => {
+                pulseengine_mcp_auth::AuthConfig {
+                    enabled: true,
+                    ..Default::default()
+                }
+            }
             _ => pulseengine_mcp_auth::AuthConfig {
                 enabled: false,
                 ..Default::default()
@@ -501,7 +513,9 @@ async fn main() -> Result<()> {
                         jsonrpc: "2.0".to_string(),
                         id: None,
                         result: None,
-                        error: Some(pulseengine_mcp_protocol::Error::internal_error(e.to_string())),
+                        error: Some(pulseengine_mcp_protocol::Error::internal_error(
+                            e.to_string(),
+                        )),
                     }
                 })
             })

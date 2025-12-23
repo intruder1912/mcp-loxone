@@ -140,10 +140,7 @@ impl LoxoneMcpServer {
         let mut lights = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(
                 control_type,
@@ -194,9 +191,7 @@ impl LoxoneMcpServer {
 
         let mode = mode.unwrap_or_else(|| "auto".to_string());
         if !["heat", "cool", "auto", "off"].contains(&mode.as_str()) {
-            return Err(format!(
-                "Invalid mode '{mode}'. Use: heat, cool, auto, off"
-            ));
+            return Err(format!("Invalid mode '{mode}'. Use: heat, cool, auto, off"));
         }
 
         Ok(json!({
@@ -220,10 +215,7 @@ impl LoxoneMcpServer {
         let mut climate_data = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(
                 control_type,
@@ -279,7 +271,11 @@ impl LoxoneMcpServer {
                 "down" | "close" | "ab" | "zu" => "FullDown".to_string(),
                 "stop" | "halt" => "Stop".to_string(),
                 "shade" | "schatten" => "Shade".to_string(),
-                _ => return Err(format!("Invalid action '{act}'. Use: up, down, stop, shade")),
+                _ => {
+                    return Err(format!(
+                        "Invalid action '{act}'. Use: up, down, stop, shade"
+                    ))
+                }
             }
         } else {
             return Err("Either action or position must be provided".to_string());
@@ -305,10 +301,7 @@ impl LoxoneMcpServer {
         let mut blinds = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "Jalousie" | "Blinds" | "Rolladen") {
                 let name = control
@@ -480,7 +473,11 @@ impl LoxoneMcpServer {
             "previous" | "zurück" | "vorheriger" => "previous",
             "mute" | "stumm" => "mute",
             "unmute" | "laut" => "unmute",
-            _ => return Err(format!("Invalid action '{action}'. Use: play, pause, stop, next, previous, mute, unmute")),
+            _ => {
+                return Err(format!(
+                "Invalid action '{action}'. Use: play, pause, stop, next, previous, mute, unmute"
+            ))
+            }
         };
 
         Ok(json!({
@@ -524,14 +521,17 @@ impl LoxoneMcpServer {
         let mut audio_zones = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if control_type.contains("Audio") || control_type == "MediaController" {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 audio_zones.push(json!({
                     "uuid": uuid,
@@ -567,19 +567,27 @@ impl LoxoneMcpServer {
         let mut sensors = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             // Match sensor types
             if matches!(
                 control_type,
-                "InfoOnlyAnalog" | "InfoOnlyDigital" | "PresenceDetector" |
-                "MotionSensor" | "SmokeAlarm" | "Meter" | "Sensor"
+                "InfoOnlyAnalog"
+                    | "InfoOnlyDigital"
+                    | "PresenceDetector"
+                    | "MotionSensor"
+                    | "SmokeAlarm"
+                    | "Meter"
+                    | "Sensor"
             ) {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 sensors.push(json!({
                     "uuid": uuid,
@@ -611,10 +619,7 @@ impl LoxoneMcpServer {
         let mut door_windows = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
             let name = control
                 .get("name")
                 .and_then(|v| v.as_str())
@@ -623,10 +628,15 @@ impl LoxoneMcpServer {
 
             // Match door/window sensors
             if control_type == "InfoOnlyDigital"
-                && (name.contains("door") || name.contains("window") ||
-                    name.contains("tür") || name.contains("fenster"))
+                && (name.contains("door")
+                    || name.contains("window")
+                    || name.contains("tür")
+                    || name.contains("fenster"))
             {
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 door_windows.push(json!({
                     "uuid": uuid,
@@ -655,14 +665,17 @@ impl LoxoneMcpServer {
         let mut motion_sensors = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "PresenceDetector" | "MotionSensor") {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 motion_sensors.push(json!({
                     "uuid": uuid,
@@ -697,13 +710,13 @@ impl LoxoneMcpServer {
         let mut weather_devices = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if control_type.contains("Weather") {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 weather_devices.push(json!({
                     "uuid": uuid,
@@ -738,16 +751,19 @@ impl LoxoneMcpServer {
         let mut energy_devices = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "Meter" | "EnergyManager" | "EnergyMonitor")
                 || control_type.contains("Energy")
             {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 energy_devices.push(json!({
                     "uuid": uuid,
@@ -779,7 +795,11 @@ impl LoxoneMcpServer {
             "start" | "laden" => "start",
             "stop" | "stoppen" => "stop",
             "pause" | "pausieren" => "pause",
-            _ => return Err(format!("Invalid action '{action}'. Use: start, stop, pause")),
+            _ => {
+                return Err(format!(
+                    "Invalid action '{action}'. Use: start, stop, pause"
+                ))
+            }
         };
 
         Ok(json!({
@@ -809,18 +829,21 @@ impl LoxoneMcpServer {
         let mut security_devices = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(
                 control_type,
                 "Alarm" | "SmokeAlarm" | "Gate" | "DoorLock" | "AccessControl"
             ) || control_type.contains("Security")
             {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 security_devices.push(json!({
                     "uuid": uuid,
@@ -851,7 +874,11 @@ impl LoxoneMcpServer {
             "arm" | "arm_away" | "scharf" | "abwesend" => "arm_away",
             "arm_home" | "arm_stay" | "zuhause" => "arm_home",
             "disarm" | "unscharf" | "aus" => "disarm",
-            _ => return Err(format!("Invalid mode '{mode}'. Use: arm_away, arm_home, disarm")),
+            _ => {
+                return Err(format!(
+                    "Invalid mode '{mode}'. Use: arm_away, arm_home, disarm"
+                ))
+            }
         };
 
         Ok(json!({
@@ -903,16 +930,19 @@ impl LoxoneMcpServer {
         let mut cameras = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "Intercom" | "Camera" | "Doorbell")
                 || control_type.contains("Camera")
             {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 cameras.push(json!({
                     "uuid": uuid,
@@ -949,7 +979,11 @@ impl LoxoneMcpServer {
             "open" | "öffnen" | "tür" => "open_door",
             "talk" | "sprechen" => "talk",
             "mute" | "stumm" => "mute",
-            _ => return Err(format!("Invalid action '{action}'. Use: answer, hangup, open, talk, mute")),
+            _ => {
+                return Err(format!(
+                    "Invalid action '{action}'. Use: answer, hangup, open, talk, mute"
+                ))
+            }
         };
 
         Ok(json!({
@@ -1003,14 +1037,17 @@ impl LoxoneMcpServer {
         let mut scenes = Vec::new();
 
         for (uuid, control) in &structure.controls {
-            let control_type = control
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "LightController" | "MoodSwitch") {
-                let name = control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                let room = control.get("room").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let room = control
+                    .get("room")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
 
                 // Extract moods if available
                 let moods = control.get("moods").cloned().unwrap_or(json!([]));
