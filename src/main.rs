@@ -1,6 +1,10 @@
 //! Loxone MCP Server - Main Entry Point
 //!
 //! Uses pulseengine-mcp 0.17.0 framework with macros support.
+//!
+//! This server supports two modes:
+//! - Macro-based: Uses #[mcp_server] and #[mcp_tools] for simplified tool definitions
+//! - Legacy: Uses manual McpBackend implementation for complex HTTP setups
 
 use pulseengine_mcp_auth::AuthenticationManager;
 use pulseengine_mcp_protocol::{
@@ -10,14 +14,14 @@ use pulseengine_mcp_protocol::{
     UrlElicitationCapability,
 };
 use pulseengine_mcp_security::SecurityMiddleware;
-use pulseengine_mcp_server::{middleware::MiddlewareStack, GenericServerHandler};
+use pulseengine_mcp_server::{middleware::MiddlewareStack, GenericServerHandler, McpServerBuilder};
 use pulseengine_mcp_transport::{create_transport, Transport};
 
 use loxone_mcp_rust::{
     config::{
         credential_registry::CredentialRegistry, credentials::create_best_credential_manager,
     },
-    server::framework_backend::create_loxone_backend,
+    server::{framework_backend::create_loxone_backend, macro_backend::LoxoneMcpServer},
     Result, ServerConfig as LoxoneServerConfig,
 };
 
@@ -266,10 +270,27 @@ async fn main() -> Result<()> {
             }
         };
 
+    // For stdio offline mode, use the simplified macro-based server
+    if let TransportCommand::Stdio { offline: true } = &config.transport {
+        info!("🚀 Starting macro-based MCP server in offline mode");
+        LoxoneMcpServer::configure_stdio_logging();
+
+        let server = LoxoneMcpServer::with_defaults();
+        let mut mcp_server = server.serve_stdio().await
+            .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}")))?;
+
+        info!("✅ Macro-based server started successfully");
+        mcp_server.run().await
+            .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}")))?;
+
+        return Ok(());
+    }
+
     // Create Loxone configuration
     let loxone_config = match &config.transport {
         TransportCommand::Stdio { offline } => {
             if *offline {
+                // This branch is now handled above, but kept for completeness
                 info!("Running in offline mode - no Loxone connection");
                 LoxoneServerConfig::offline_mode()
             } else {
