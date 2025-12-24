@@ -2,7 +2,8 @@
 # This creates a minimal container with just the binary and required runtime dependencies
 
 # Stage 1: Build the application
-FROM rust:1.75-alpine AS builder
+# Rust 1.85+ required for Rust 2024 edition
+FROM rust:1.85-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
