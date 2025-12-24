@@ -1,13 +1,13 @@
 [workspace]
 members = [
     ".",
-    "examples/hello-world-mcp",
+    # "examples/hello-world-mcp",  # TODO: Update to 0.17.0 macro API
 ]
 
 resolver = "2"
 
 [workspace.package]
-rust-version = "1.79"
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Core dependencies
@@ -62,7 +62,7 @@ futures-util = "0.3"
 [package]
 name = "loxone-mcp-rust"
 version = "0.7.0"
-edition = "2021"
+edition = "2024"
 authors = ["Ralf Anton Beier <ralf_beier@me.com>"]
 license = "MIT OR Apache-2.0"
 description = "High-performance async Rust library for Loxone home automation systems with MCP server support"

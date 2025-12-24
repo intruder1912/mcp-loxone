@@ -3,18 +3,18 @@
 //! Tests WebSocket functionality using WireMock for realistic server simulation
 //! and proper environment isolation.
 
+use loxone_mcp_rust::ServerConfig;
 use loxone_mcp_rust::config::CredentialStore;
 use loxone_mcp_rust::server::framework_backend::LoxoneFrameworkBackend;
-use loxone_mcp_rust::ServerConfig;
 use rstest::*;
 use serial_test::serial;
 use wiremock::{
-    matchers::{header, method, path},
     Mock, ResponseTemplate,
+    matchers::{header, method, path},
 };
 
 mod common;
-use common::{test_fixtures::*, MockLoxoneServer};
+use common::{MockLoxoneServer, test_fixtures::*};
 
 #[cfg(feature = "websocket")]
 mod websocket_integration_tests {

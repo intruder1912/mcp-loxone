@@ -1,7 +1,7 @@
 //! JSON Schema validation for MCP requests and responses
 
 use super::{
-    utils, ValidationContext, ValidationError, ValidationErrorCode, ValidationResult, Validator,
+    ValidationContext, ValidationError, ValidationErrorCode, ValidationResult, Validator, utils,
 };
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
@@ -375,62 +375,59 @@ impl SchemaValidator {
         errors: &mut Vec<ValidationError>,
     ) {
         // Length validation
-        if let Some(min_len) = schema.min_length {
-            if value.len() < min_len {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("String too short: {} < {}", value.len(), min_len),
-                    code: ValidationErrorCode::TooShort,
-                    expected: Some(format!("Minimum length: {min_len}")),
-                    actual: Some(format!("Length: {}", value.len())),
-                    suggestion: Some("Provide a longer string".to_string()),
-                });
-            }
+        if let Some(min_len) = schema.min_length
+            && value.len() < min_len
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("String too short: {} < {}", value.len(), min_len),
+                code: ValidationErrorCode::TooShort,
+                expected: Some(format!("Minimum length: {min_len}")),
+                actual: Some(format!("Length: {}", value.len())),
+                suggestion: Some("Provide a longer string".to_string()),
+            });
         }
 
-        if let Some(max_len) = schema.max_length {
-            if value.len() > max_len {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("String too long: {} > {}", value.len(), max_len),
-                    code: ValidationErrorCode::TooLong,
-                    expected: Some(format!("Maximum length: {max_len}")),
-                    actual: Some(format!("Length: {}", value.len())),
-                    suggestion: Some("Provide a shorter string".to_string()),
-                });
-            }
+        if let Some(max_len) = schema.max_length
+            && value.len() > max_len
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("String too long: {} > {}", value.len(), max_len),
+                code: ValidationErrorCode::TooLong,
+                expected: Some(format!("Maximum length: {max_len}")),
+                actual: Some(format!("Length: {}", value.len())),
+                suggestion: Some("Provide a shorter string".to_string()),
+            });
         }
 
         // Pattern validation
-        if let Some(pattern) = &schema.pattern {
-            if let Ok(regex) = regex::Regex::new(pattern) {
-                if !regex.is_match(value) {
-                    errors.push(ValidationError {
-                        field: field_path.to_string(),
-                        message: format!("String does not match pattern: {pattern}"),
-                        code: ValidationErrorCode::PatternMismatch,
-                        expected: Some(format!("Pattern: {pattern}")),
-                        actual: Some(value.to_string()),
-                        suggestion: Some(
-                            "Provide a string matching the required pattern".to_string(),
-                        ),
-                    });
-                }
-            }
+        if let Some(pattern) = &schema.pattern
+            && let Ok(regex) = regex::Regex::new(pattern)
+            && !regex.is_match(value)
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("String does not match pattern: {pattern}"),
+                code: ValidationErrorCode::PatternMismatch,
+                expected: Some(format!("Pattern: {pattern}")),
+                actual: Some(value.to_string()),
+                suggestion: Some("Provide a string matching the required pattern".to_string()),
+            });
         }
 
         // Enum validation
-        if let Some(enum_values) = &schema.enum_values {
-            if !enum_values.contains(&value.to_string()) {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("Invalid enum value: {value}"),
-                    code: ValidationErrorCode::InvalidEnum,
-                    expected: Some(format!("One of: {enum_values:?}")),
-                    actual: Some(value.to_string()),
-                    suggestion: Some(format!("Use one of: {}", enum_values.join(", "))),
-                });
-            }
+        if let Some(enum_values) = &schema.enum_values
+            && !enum_values.contains(&value.to_string())
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("Invalid enum value: {value}"),
+                code: ValidationErrorCode::InvalidEnum,
+                expected: Some(format!("One of: {enum_values:?}")),
+                actual: Some(value.to_string()),
+                suggestion: Some(format!("Use one of: {}", enum_values.join(", "))),
+            });
         }
 
         // Security validation
@@ -465,30 +462,30 @@ impl SchemaValidator {
         };
 
         // Range validation
-        if let Some(min) = schema.minimum {
-            if num_value < min {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("Number too small: {num_value} < {min}"),
-                    code: ValidationErrorCode::OutOfRange,
-                    expected: Some(format!("Minimum: {min}")),
-                    actual: Some(num_value.to_string()),
-                    suggestion: Some(format!("Use a value >= {min}")),
-                });
-            }
+        if let Some(min) = schema.minimum
+            && num_value < min
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("Number too small: {num_value} < {min}"),
+                code: ValidationErrorCode::OutOfRange,
+                expected: Some(format!("Minimum: {min}")),
+                actual: Some(num_value.to_string()),
+                suggestion: Some(format!("Use a value >= {min}")),
+            });
         }
 
-        if let Some(max) = schema.maximum {
-            if num_value > max {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("Number too large: {num_value} > {max}"),
-                    code: ValidationErrorCode::OutOfRange,
-                    expected: Some(format!("Maximum: {max}")),
-                    actual: Some(num_value.to_string()),
-                    suggestion: Some(format!("Use a value <= {max}")),
-                });
-            }
+        if let Some(max) = schema.maximum
+            && num_value > max
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("Number too large: {num_value} > {max}"),
+                code: ValidationErrorCode::OutOfRange,
+                expected: Some(format!("Maximum: {max}")),
+                actual: Some(num_value.to_string()),
+                suggestion: Some(format!("Use a value <= {max}")),
+            });
         }
     }
 
@@ -501,30 +498,30 @@ impl SchemaValidator {
         errors: &mut Vec<ValidationError>,
     ) {
         // Length validation
-        if let Some(min_items) = schema.min_items {
-            if value.len() < min_items {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("Array too short: {} < {min_items}", value.len()),
-                    code: ValidationErrorCode::TooShort,
-                    expected: Some(format!("Minimum items: {min_items}")),
-                    actual: Some(format!("Items: {}", value.len())),
-                    suggestion: Some("Add more items to the array".to_string()),
-                });
-            }
+        if let Some(min_items) = schema.min_items
+            && value.len() < min_items
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("Array too short: {} < {min_items}", value.len()),
+                code: ValidationErrorCode::TooShort,
+                expected: Some(format!("Minimum items: {min_items}")),
+                actual: Some(format!("Items: {}", value.len())),
+                suggestion: Some("Add more items to the array".to_string()),
+            });
         }
 
-        if let Some(max_items) = schema.max_items {
-            if value.len() > max_items {
-                errors.push(ValidationError {
-                    field: field_path.to_string(),
-                    message: format!("Array too long: {} > {max_items}", value.len()),
-                    code: ValidationErrorCode::TooLong,
-                    expected: Some(format!("Maximum items: {max_items}")),
-                    actual: Some(format!("Items: {}", value.len())),
-                    suggestion: Some("Remove some items from the array".to_string()),
-                });
-            }
+        if let Some(max_items) = schema.max_items
+            && value.len() > max_items
+        {
+            errors.push(ValidationError {
+                field: field_path.to_string(),
+                message: format!("Array too long: {} > {max_items}", value.len()),
+                code: ValidationErrorCode::TooLong,
+                expected: Some(format!("Maximum items: {max_items}")),
+                actual: Some(format!("Items: {}", value.len())),
+                suggestion: Some("Remove some items from the array".to_string()),
+            });
         }
 
         // Validate array items

@@ -2,21 +2,21 @@
 //!
 //! Tests the device tools logic in isolation with mock data.
 
+use loxone_mcp_rust::ServerConfig;
 use loxone_mcp_rust::client::LoxoneDevice;
 use loxone_mcp_rust::config::CredentialStore;
 use loxone_mcp_rust::server::framework_backend::LoxoneFrameworkBackend;
-use loxone_mcp_rust::ServerConfig;
 // use rstest::*; // Unused import
 use serde_json::json;
 // use serial_test::serial; // Unused import
 use std::collections::HashMap;
 use wiremock::{
-    matchers::{method, path_regex},
     Mock, ResponseTemplate,
+    matchers::{method, path_regex},
 };
 
 mod common;
-use common::{test_fixtures::TestDeviceUuids, MockLoxoneServer};
+use common::{MockLoxoneServer, test_fixtures::TestDeviceUuids};
 
 /// Create test devices for testing device logic
 #[allow(dead_code)]

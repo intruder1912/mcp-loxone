@@ -4,11 +4,11 @@ use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use url::Url;
 
-use crate::client::{http_client::LoxoneHttpClient, LoxoneClient};
+use crate::client::{LoxoneClient, http_client::LoxoneHttpClient};
 
 pub struct DeviceDiscovery {
     client: LoxoneHttpClient,
@@ -76,10 +76,10 @@ impl DeviceDiscovery {
         let mut working_sensors = Vec::new();
 
         for sensor in sensors {
-            if let Some(uuid) = sensor.get("uuid").and_then(|u| u.as_str()) {
-                if self.test_device_connectivity(uuid).await.unwrap_or(false) {
-                    working_sensors.push(sensor);
-                }
+            if let Some(uuid) = sensor.get("uuid").and_then(|u| u.as_str())
+                && self.test_device_connectivity(uuid).await.unwrap_or(false)
+            {
+                working_sensors.push(sensor);
             }
         }
 
@@ -117,21 +117,19 @@ impl DeviceDiscovery {
             } // Limit discovery time
             count += 1;
 
-            if let Ok(Message::Text(text)) = msg {
-                if let Ok(data) = serde_json::from_str::<Value>(&text) {
-                    if let Some(controls) = data.get("LL").and_then(|ll| ll.get("controls")) {
-                        if let Some(controls_obj) = controls.as_object() {
-                            for (uuid, control) in controls_obj {
-                                let device = json!({
-                                    "uuid": uuid,
-                                    "name": control.get("name"),
-                                    "type": control.get("type"),
-                                    "discovered_via": "websocket"
-                                });
-                                devices.push(device);
-                            }
-                        }
-                    }
+            if let Ok(Message::Text(text)) = msg
+                && let Ok(data) = serde_json::from_str::<Value>(&text)
+                && let Some(controls) = data.get("LL").and_then(|ll| ll.get("controls"))
+                && let Some(controls_obj) = controls.as_object()
+            {
+                for (uuid, control) in controls_obj {
+                    let device = json!({
+                        "uuid": uuid,
+                        "name": control.get("name"),
+                        "type": control.get("type"),
+                        "discovered_via": "websocket"
+                    });
+                    devices.push(device);
                 }
             }
         }

@@ -672,7 +672,7 @@ impl ResourceManager {
         // Check for template placeholders (curly braces)
         if uri.contains('{') || uri.contains('}') {
             return Err(LoxoneError::invalid_input(
-                "URI contains template placeholders (curly braces). Use concrete values instead of template URIs. For example, use 'loxone://rooms/Kitchen/devices' instead of 'loxone://rooms/{roomName}/devices'"
+                "URI contains template placeholders (curly braces). Use concrete values instead of template URIs. For example, use 'loxone://rooms/Kitchen/devices' instead of 'loxone://rooms/{roomName}/devices'",
             ));
         }
 
@@ -884,22 +884,22 @@ impl ResourceManager {
         resource: &LoxoneResource,
     ) -> Result<()> {
         // Validate path parameters based on resource URI template
-        if resource.uri.contains("{roomName}") {
-            if let Some(room_name) = path_params.get("roomName") {
-                self.validate_room_name(room_name)?;
-            }
+        if resource.uri.contains("{roomName}")
+            && let Some(room_name) = path_params.get("roomName")
+        {
+            self.validate_room_name(room_name)?;
         }
 
-        if resource.uri.contains("{deviceType}") {
-            if let Some(device_type) = path_params.get("deviceType") {
-                self.validate_device_type(device_type)?;
-            }
+        if resource.uri.contains("{deviceType}")
+            && let Some(device_type) = path_params.get("deviceType")
+        {
+            self.validate_device_type(device_type)?;
         }
 
-        if resource.uri.contains("{category}") {
-            if let Some(category) = path_params.get("category") {
-                self.validate_device_category(category)?;
-            }
+        if resource.uri.contains("{category}")
+            && let Some(category) = path_params.get("category")
+        {
+            self.validate_device_category(category)?;
         }
 
         // Validate query parameter combinations
@@ -1068,12 +1068,12 @@ impl ResourceManager {
             cache.retain(|_, entry| !entry.is_expired());
 
             // Check for valid cached entry
-            if let Some(entry) = cache.get_mut(&cache_key) {
-                if !entry.is_expired() {
-                    debug!("Cache hit for resource: {}", context.uri);
-                    *self.cache_hits.write().await += 1;
-                    return Ok(entry.access().clone());
-                }
+            if let Some(entry) = cache.get_mut(&cache_key)
+                && !entry.is_expired()
+            {
+                debug!("Cache hit for resource: {}", context.uri);
+                *self.cache_hits.write().await += 1;
+                return Ok(entry.access().clone());
             }
         }
 

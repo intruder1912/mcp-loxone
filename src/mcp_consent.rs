@@ -15,7 +15,7 @@ use crate::error::{LoxoneError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -363,10 +363,10 @@ impl ConsentManager {
         }
 
         // Send request to UI if channel is available
-        if let Some(sender) = &self.request_sender {
-            if let Err(e) = sender.send(request.clone()) {
-                warn!("Failed to send consent request to UI: {}", e);
-            }
+        if let Some(sender) = &self.request_sender
+            && let Err(e) = sender.send(request.clone())
+        {
+            warn!("Failed to send consent request to UI: {}", e);
         }
 
         // Wait for response or timeout
@@ -744,7 +744,7 @@ pub trait ConsentProtected {
         consent_manager: &ConsentManager,
         source: String,
         executor: impl Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send>>
-            + Send,
+        + Send,
     ) -> Result<T>;
 }
 
@@ -759,7 +759,7 @@ where
         consent_manager: &ConsentManager,
         source: String,
         executor: impl Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send>>
-            + Send,
+        + Send,
     ) -> Result<T> {
         // Request consent
         let decision = consent_manager.request_consent(operation, source).await?;
@@ -767,8 +767,8 @@ where
         match decision {
             ConsentDecision::Approved | ConsentDecision::AutoApproved { .. } => {
                 // Execute the operation
-                let result = executor().await;
-                result
+
+                executor().await
             }
             ConsentDecision::Denied { reason } => Err(LoxoneError::consent_denied(reason)),
             ConsentDecision::TimedOut => Err(LoxoneError::consent_denied(

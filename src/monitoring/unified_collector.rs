@@ -13,7 +13,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tokio::time::interval;
 use tracing::{debug, error, info};
 

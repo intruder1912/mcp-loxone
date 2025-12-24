@@ -8,19 +8,19 @@
 //! - testcontainers for complex scenarios
 //! - pulseengine-mcp framework integration
 
+use loxone_mcp_rust::ServerConfig;
 use loxone_mcp_rust::config::CredentialStore;
 use loxone_mcp_rust::server::framework_backend::LoxoneFrameworkBackend;
-use loxone_mcp_rust::ServerConfig;
 use rstest::*;
 use wiremock::{
-    matchers::{method, path},
     Mock, ResponseTemplate,
+    matchers::{method, path},
 };
 
 mod common;
 use common::{
-    containers::ContainerTestEnvironment, test_fixtures::test_server_config,
-    test_fixtures::TestDeviceUuids, MockLoxoneServer,
+    MockLoxoneServer, containers::ContainerTestEnvironment, test_fixtures::TestDeviceUuids,
+    test_fixtures::test_server_config,
 };
 
 /// Comprehensive test demonstrating the full testing stack

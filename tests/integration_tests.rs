@@ -2,9 +2,9 @@
 //!
 //! Tests the complete integration of Loxone MCP tools with the pulseengine-mcp framework
 
+use loxone_mcp_rust::ServerConfig;
 use loxone_mcp_rust::config::CredentialStore;
 use loxone_mcp_rust::server::framework_backend::LoxoneFrameworkBackend;
-use loxone_mcp_rust::ServerConfig;
 use rstest::*;
 use serial_test::serial;
 

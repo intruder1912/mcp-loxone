@@ -10,8 +10,8 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
-use tokio::time::{interval, Duration as TokioDuration};
+use tokio::sync::{RwLock, broadcast};
+use tokio::time::{Duration as TokioDuration, interval};
 use tracing::{debug, error, info, warn};
 
 /// Health monitoring configuration

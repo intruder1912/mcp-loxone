@@ -5,7 +5,7 @@
 
 use loxone_mcp_rust::tools::ToolContextBuilder;
 use std::sync::Arc;
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -14,21 +14,21 @@ use pulseengine_mcp_protocol::{
     UrlElicitationCapability,
 };
 use pulseengine_mcp_security::SecurityMiddleware;
-use pulseengine_mcp_server::{middleware::MiddlewareStack, GenericServerHandler, McpServerBuilder};
-use pulseengine_mcp_transport::{create_transport, Transport};
+use pulseengine_mcp_server::{GenericServerHandler, McpServerBuilder, middleware::MiddlewareStack};
+use pulseengine_mcp_transport::{Transport, create_transport};
 
 use loxone_mcp_rust::{
+    Result, ServerConfig as LoxoneServerConfig,
     config::{
         credential_registry::CredentialRegistry, credentials::create_best_credential_manager,
     },
     server::{framework_backend::create_loxone_backend, macro_backend::LoxoneMcpServer},
-    Result, ServerConfig as LoxoneServerConfig,
 };
 
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Loxone MCP Server Configuration
 #[derive(Parser, Debug)]
@@ -129,21 +129,21 @@ impl Config {
             TransportCommand::Stdio { offline } => {
                 if !offline && !has_credential_id && !has_direct_credentials {
                     return Err(loxone_mcp_rust::LoxoneError::config(
-                        "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --offline mode"
+                        "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --offline mode",
                     ));
                 }
             }
             TransportCommand::Http { dev_mode, .. } => {
                 if !dev_mode && !has_credential_id && !has_direct_credentials {
                     return Err(loxone_mcp_rust::LoxoneError::config(
-                        "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --dev-mode"
+                        "Loxone credentials required. Use --credential-id <id>, set LOXONE_HOST/LOXONE_USER/LOXONE_PASS, or use --dev-mode",
                     ));
                 }
             }
             TransportCommand::StreamableHttp { .. } => {
                 if !has_credential_id && !has_direct_credentials {
                     return Err(loxone_mcp_rust::LoxoneError::config(
-                        "Loxone credentials required. Use --credential-id <id> or set LOXONE_HOST/LOXONE_USER/LOXONE_PASS"
+                        "Loxone credentials required. Use --credential-id <id> or set LOXONE_HOST/LOXONE_USER/LOXONE_PASS",
                     ));
                 }
             }
@@ -195,7 +195,8 @@ async fn load_credentials_by_id(credential_id: &str) -> Result<(String, String, 
     })?;
 
     let manager = create_best_credential_manager().await?;
-    std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port));
+    // SAFETY: This is called early in main before spawning threads that read env vars
+    unsafe { std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port)) };
 
     let credentials = manager.get_credentials().await.map_err(|e| {
         loxone_mcp_rust::LoxoneError::config(format!(
@@ -259,14 +260,14 @@ async fn main() -> Result<()> {
             }
             Err(e) => {
                 return Err(loxone_mcp_rust::LoxoneError::config(format!(
-                        "No credentials available. Please either:\n\
+                    "No credentials available. Please either:\n\
                          1. Use --credential-id <id> (run 'loxone-mcp-auth list' to see available IDs)\n\
                          2. Set --loxone-host, --loxone-user, --loxone-password\n\
                          3. Set environment variables LOXONE_HOST, LOXONE_USER, LOXONE_PASS\n\
                          4. Run 'loxone-mcp-setup' to configure credentials\n\
                          \n\
                          Error details: {e}"
-                    )));
+                )));
             }
         }
     };

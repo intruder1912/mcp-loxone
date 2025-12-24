@@ -33,12 +33,16 @@ async fn test_consent_config_creation() {
     let config = ConsentConfig::default();
     assert!(config.enabled);
     assert_eq!(config.default_timeout, Duration::from_secs(300));
-    assert!(config
-        .required_for_sensitivity
-        .contains(&SensitivityLevel::High));
-    assert!(config
-        .required_for_sensitivity
-        .contains(&SensitivityLevel::Critical));
+    assert!(
+        config
+            .required_for_sensitivity
+            .contains(&SensitivityLevel::High)
+    );
+    assert!(
+        config
+            .required_for_sensitivity
+            .contains(&SensitivityLevel::Critical)
+    );
     assert!(config.require_bulk_consent);
     assert_eq!(config.bulk_threshold, 5);
 }

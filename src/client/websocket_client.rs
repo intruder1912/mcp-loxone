@@ -13,7 +13,7 @@
 #[cfg(feature = "websocket")]
 use crate::client::{ClientContext, LoxoneClient, LoxoneResponse, LoxoneStructure};
 #[cfg(feature = "websocket")]
-use crate::config::{credentials::LoxoneCredentials, AuthMethod, LoxoneConfig};
+use crate::config::{AuthMethod, LoxoneConfig, credentials::LoxoneCredentials};
 #[cfg(feature = "websocket")]
 use crate::error::{LoxoneError, Result};
 #[cfg(feature = "websocket")]
@@ -37,11 +37,11 @@ use std::sync::Arc;
 #[cfg(feature = "websocket")]
 use std::time::Duration;
 #[cfg(feature = "websocket")]
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, mpsc};
 #[cfg(feature = "websocket")]
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
 #[cfg(feature = "websocket")]
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 #[cfg(feature = "websocket")]
 use tracing::{debug, error, info, warn};
 #[cfg(feature = "websocket")]
@@ -702,7 +702,7 @@ impl LoxoneWebSocketClient {
             _ => {
                 return Err(LoxoneError::connection(
                     "Unsupported URL scheme for WebSocket",
-                ))
+                ));
             }
         }
 
@@ -728,7 +728,9 @@ impl LoxoneWebSocketClient {
                     }
                     Ok(None) => {
                         // No token available, fall back to basic auth
-                        warn!("No token available from HTTP client, falling back to basic auth for WebSocket");
+                        warn!(
+                            "No token available from HTTP client, falling back to basic auth for WebSocket"
+                        );
                         ws_url
                             .query_pairs_mut()
                             .append_pair("user", &self.credentials.username)
@@ -736,7 +738,10 @@ impl LoxoneWebSocketClient {
                     }
                     Err(e) => {
                         // Token extraction failed, fall back to basic auth
-                        warn!("Failed to get token authentication parameters: {}, falling back to basic auth", e);
+                        warn!(
+                            "Failed to get token authentication parameters: {}, falling back to basic auth",
+                            e
+                        );
                         ws_url
                             .query_pairs_mut()
                             .append_pair("user", &self.credentials.username)
@@ -863,11 +868,11 @@ impl LoxoneWebSocketClient {
                         let key = format!("{}:{}", update.uuid, update.state);
                         let now = Instant::now();
 
-                        if let Some(last_time) = last_times.get(&key) {
-                            if now.duration_since(*last_time) < min_interval {
-                                debounced_count += 1;
-                                continue;
-                            }
+                        if let Some(last_time) = last_times.get(&key)
+                            && now.duration_since(*last_time) < min_interval
+                        {
+                            debounced_count += 1;
+                            continue;
                         }
 
                         last_times.insert(key, now);
@@ -965,26 +970,25 @@ impl LoxoneWebSocketClient {
                     if *connected.read().await {
                         // Check if we need to refresh tokens proactively
                         #[cfg(feature = "crypto-openssl")]
-                        if let Some(http_client) = &http_client {
-                            if let Some(token_client) = http_client
+                        if let Some(http_client) = &http_client
+                            && let Some(token_client) = http_client
                                 .as_ref()
                                 .as_any()
                                 .downcast_ref::<crate::client::TokenHttpClient>(
-                            ) {
-                                // Try to get auth params - this will internally handle token expiration and refresh
-                                match token_client.get_auth_params().await {
-                                    Ok(_) => {
-                                        debug!("WebSocket token authentication verified and refreshed if needed");
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            "Failed to refresh authentication for WebSocket: {}",
-                                            e
-                                        );
-                                        // Token authentication failed, force WebSocket reconnection with new token
-                                        *connected.write().await = false;
-                                        continue;
-                                    }
+                            )
+                        {
+                            // Try to get auth params - this will internally handle token expiration and refresh
+                            match token_client.get_auth_params().await {
+                                Ok(_) => {
+                                    debug!(
+                                        "WebSocket token authentication verified and refreshed if needed"
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!("Failed to refresh authentication for WebSocket: {}", e);
+                                    // Token authentication failed, force WebSocket reconnection with new token
+                                    *connected.write().await = false;
+                                    continue;
                                 }
                             }
                         }
@@ -995,11 +999,11 @@ impl LoxoneWebSocketClient {
                     }
 
                     // Check if we've exceeded max attempts
-                    if let Some(max_attempts) = reconnection_config.max_attempts {
-                        if attempt >= max_attempts {
-                            error!("Max reconnection attempts ({}) exceeded", max_attempts);
-                            break;
-                        }
+                    if let Some(max_attempts) = reconnection_config.max_attempts
+                        && attempt >= max_attempts
+                    {
+                        error!("Max reconnection attempts ({}) exceeded", max_attempts);
+                        break;
                     }
 
                     attempt += 1;
@@ -1035,11 +1039,16 @@ impl LoxoneWebSocketClient {
                                 .await
                             {
                                 Ok(stream) => {
-                                    info!("WebSocket reconnection successful with token authentication");
+                                    info!(
+                                        "WebSocket reconnection successful with token authentication"
+                                    );
                                     Ok(stream)
                                 }
                                 Err(e) => {
-                                    warn!("Token-based reconnection failed: {}, falling back to basic auth", e);
+                                    warn!(
+                                        "Token-based reconnection failed: {}, falling back to basic auth",
+                                        e
+                                    );
                                     Self::attempt_reconnection(&base_url, &credentials, &config)
                                         .await
                                 }
@@ -1160,10 +1169,10 @@ impl LoxoneWebSocketClient {
         }
 
         // Check state name pattern
-        if let Some(pattern) = &filter.state_name_pattern {
-            if !pattern.is_match(&update.state) {
-                return false;
-            }
+        if let Some(pattern) = &filter.state_name_pattern
+            && !pattern.is_match(&update.state)
+        {
+            return false;
         }
 
         // Check value pattern (convert value to string for matching)
@@ -1411,7 +1420,7 @@ impl LoxoneWebSocketClient {
             _ => {
                 return Err(LoxoneError::connection(
                     "Unsupported URL scheme for WebSocket",
-                ))
+                ));
             }
         }
 
@@ -1460,7 +1469,7 @@ impl LoxoneWebSocketClient {
             _ => {
                 return Err(LoxoneError::connection(
                     "Unsupported URL scheme for WebSocket",
-                ))
+                ));
             }
         }
 
@@ -1552,54 +1561,53 @@ impl LoxoneWebSocketClient {
         match message.msg_type.as_str() {
             "text" | "state" => {
                 // Handle text-based state updates
-                if let Some(uuid) = message.data.get("uuid").and_then(|v| v.as_str()) {
-                    if let Some(value) = message.data.get("value") {
-                        // Determine event type based on message content
-                        let event_type = if message.data.get("type").and_then(|v| v.as_str())
-                            == Some("weather")
-                        {
-                            LoxoneEventType::Weather
-                        } else if message.data.get("type").and_then(|v| v.as_str()) == Some("alarm")
-                        {
-                            LoxoneEventType::Alarm
-                        } else {
-                            LoxoneEventType::State
-                        };
+                if let Some(uuid) = message.data.get("uuid").and_then(|v| v.as_str())
+                    && let Some(value) = message.data.get("value")
+                {
+                    // Determine event type based on message content
+                    let event_type = if message.data.get("type").and_then(|v| v.as_str())
+                        == Some("weather")
+                    {
+                        LoxoneEventType::Weather
+                    } else if message.data.get("type").and_then(|v| v.as_str()) == Some("alarm") {
+                        LoxoneEventType::Alarm
+                    } else {
+                        LoxoneEventType::State
+                    };
 
-                        let state_name = message
+                    let state_name = message
+                        .data
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("value")
+                        .to_string();
+
+                    let update = StateUpdate {
+                        uuid: uuid.to_string(),
+                        state: state_name,
+                        value: value.clone(),
+                        previous_value: message.data.get("previous").cloned(),
+                        event_type,
+                        timestamp: message
+                            .timestamp
+                            .and_then(|ts| chrono::DateTime::from_timestamp(ts as i64, 0))
+                            .unwrap_or_else(chrono::Utc::now),
+                        room: message
                             .data
-                            .get("state")
+                            .get("room")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("value")
-                            .to_string();
+                            .map(String::from),
+                        device_name: message
+                            .data
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .map(String::from),
+                    };
 
-                        let update = StateUpdate {
-                            uuid: uuid.to_string(),
-                            state: state_name,
-                            value: value.clone(),
-                            previous_value: message.data.get("previous").cloned(),
-                            event_type,
-                            timestamp: message
-                                .timestamp
-                                .and_then(|ts| chrono::DateTime::from_timestamp(ts as i64, 0))
-                                .unwrap_or_else(chrono::Utc::now),
-                            room: message
-                                .data
-                                .get("room")
-                                .and_then(|v| v.as_str())
-                                .map(String::from),
-                            device_name: message
-                                .data
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .map(String::from),
-                        };
-
-                        if let Some(sender) = state_sender {
-                            if sender.send(update).is_err() {
-                                warn!("Failed to send state update - receiver may be closed");
-                            }
-                        }
+                    if let Some(sender) = state_sender
+                        && sender.send(update).is_err()
+                    {
+                        warn!("Failed to send state update - receiver may be closed");
                     }
                 }
             }
@@ -1729,7 +1737,9 @@ impl LoxoneWebSocketClient {
             // Weather data
             0x05000000 => {
                 debug!("Binary: Weather data");
-                return Err(LoxoneError::internal("Weather data parsing requires instance method - use handle_binary_message_instance"));
+                return Err(LoxoneError::internal(
+                    "Weather data parsing requires instance method - use handle_binary_message_instance",
+                ));
             }
 
             // Out-of-service indicator
@@ -1826,11 +1836,11 @@ impl LoxoneWebSocketClient {
 
                 if cursor.position() + text_length as u64 <= payload.len() as u64 {
                     let mut text_bytes = vec![0u8; text_length];
-                    if cursor.read_exact(&mut text_bytes).is_ok() {
-                        if let Ok(text) = String::from_utf8(text_bytes) {
-                            debug!("Text state update - index: {}, text: '{}'", index, text);
-                            states_parsed += 1;
-                        }
+                    if cursor.read_exact(&mut text_bytes).is_ok()
+                        && let Ok(text) = String::from_utf8(text_bytes)
+                    {
+                        debug!("Text state update - index: {}, text: '{}'", index, text);
+                        states_parsed += 1;
                     }
                 } else {
                     break;
@@ -2025,7 +2035,14 @@ impl LoxoneWebSocketClient {
 
                 debug!(
                     "Weather station {} - temp: {:.1}°C, humidity: {:.1}%, pressure: {:.1}hPa, wind: {:.1}km/h@{:.0}°, rain: {:.1}mm, ts: {}",
-                    station_id, temperature, humidity, pressure, wind_speed, wind_direction, precipitation, timestamp
+                    station_id,
+                    temperature,
+                    humidity,
+                    pressure,
+                    wind_speed,
+                    wind_direction,
+                    precipitation,
+                    timestamp
                 );
 
                 // Store structured weather data
@@ -2560,13 +2577,13 @@ impl LoxoneClient for LoxoneWebSocketClient {
                 // Look for the state UUID in device states
                 for device in devices.values() {
                     for state_value in device.states.values() {
-                        if let Some(uuid_str) = state_value.as_str() {
-                            if uuid_str == state_uuid {
-                                // Found the state UUID, but we need the actual value
-                                // For now, return the UUID itself - this is a limitation without HTTP client
-                                state_values.insert(state_uuid.clone(), state_value.clone());
-                                break;
-                            }
+                        if let Some(uuid_str) = state_value.as_str()
+                            && uuid_str == state_uuid
+                        {
+                            // Found the state UUID, but we need the actual value
+                            // For now, return the UUID itself - this is a limitation without HTTP client
+                            state_values.insert(state_uuid.clone(), state_value.clone());
+                            break;
                         }
                     }
                 }

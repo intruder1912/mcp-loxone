@@ -208,21 +208,21 @@ fn extract_device_name(fullname: &str, properties: &TxtProperties) -> String {
     // Try to get name from properties first
     for property in properties.iter() {
         let key_lower = property.key().to_lowercase();
-        if key_lower == "name" || key_lower == "device_name" || key_lower == "friendly_name" {
-            if let Some(value_bytes) = property.val() {
-                let value_str = String::from_utf8_lossy(value_bytes);
-                if !value_str.is_empty() {
-                    return value_str.to_string();
-                }
+        if (key_lower == "name" || key_lower == "device_name" || key_lower == "friendly_name")
+            && let Some(value_bytes) = property.val()
+        {
+            let value_str = String::from_utf8_lossy(value_bytes);
+            if !value_str.is_empty() {
+                return value_str.to_string();
             }
         }
     }
 
     // Extract from service name
-    if let Some(service_name) = fullname.split('.').next() {
-        if !service_name.is_empty() {
-            return service_name.to_string();
-        }
+    if let Some(service_name) = fullname.split('.').next()
+        && !service_name.is_empty()
+    {
+        return service_name.to_string();
     }
 
     // Default fallback

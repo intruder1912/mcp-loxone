@@ -494,10 +494,10 @@ impl InputSanitizer {
         warnings: &mut Vec<String>,
     ) {
         match value {
-            Value::String(ref mut s) => {
+            Value::String(s) => {
                 self.sanitize_string(s, path, issues, warnings);
             }
-            Value::Array(ref mut arr) => {
+            Value::Array(arr) => {
                 // Truncate array if too large
                 if arr.len() > self.config.max_array_size {
                     arr.truncate(self.config.max_array_size);
@@ -507,7 +507,7 @@ impl InputSanitizer {
                     self.sanitize_value(item, &format!("{path}[{i}]"), issues, warnings);
                 }
             }
-            Value::Object(ref mut obj) => {
+            Value::Object(obj) => {
                 // Limit object properties if too many
                 if obj.len() > self.config.max_object_properties {
                     let keys_to_remove: Vec<_> = obj
@@ -608,56 +608,56 @@ impl InputSanitizer {
     ) {
         match rule.rule_type {
             SanitizationRuleType::Regex => {
-                if let Some(regex) = self.rule_regexes.get(&rule.name) {
-                    if !regex.is_match(s) {
-                        issues.push(SanitizationIssue {
-                            issue_type: SanitizationIssueType::CustomRuleViolation,
-                            field_path: path.to_string(),
-                            description: format!(
-                                "Field does not match required pattern: {}",
-                                rule.name
-                            ),
-                            severity: SanitizationSeverity::Medium,
-                            action_taken: match &rule.action {
-                                SanitizationAction::Reject => "Request rejected".to_string(),
-                                SanitizationAction::Remove => "Content removed".to_string(),
-                                SanitizationAction::Replace(replacement) => {
-                                    format!("Replaced with: {replacement}")
-                                }
-                                SanitizationAction::Log => "Logged violation".to_string(),
-                                SanitizationAction::Encode => "Content encoded".to_string(),
-                            },
-                        });
-
-                        match &rule.action {
-                            SanitizationAction::Remove => s.clear(),
-                            SanitizationAction::Replace(replacement) => *s = replacement.clone(),
-                            SanitizationAction::Encode => {
-                                // Simple HTML encoding
-                                *s = s
-                                    .replace("&", "&amp;")
-                                    .replace("<", "&lt;")
-                                    .replace(">", "&gt;")
-                                    .replace("\"", "&quot;")
-                                    .replace("'", "&#39;");
+                if let Some(regex) = self.rule_regexes.get(&rule.name)
+                    && !regex.is_match(s)
+                {
+                    issues.push(SanitizationIssue {
+                        issue_type: SanitizationIssueType::CustomRuleViolation,
+                        field_path: path.to_string(),
+                        description: format!(
+                            "Field does not match required pattern: {}",
+                            rule.name
+                        ),
+                        severity: SanitizationSeverity::Medium,
+                        action_taken: match &rule.action {
+                            SanitizationAction::Reject => "Request rejected".to_string(),
+                            SanitizationAction::Remove => "Content removed".to_string(),
+                            SanitizationAction::Replace(replacement) => {
+                                format!("Replaced with: {replacement}")
                             }
-                            _ => {}
+                            SanitizationAction::Log => "Logged violation".to_string(),
+                            SanitizationAction::Encode => "Content encoded".to_string(),
+                        },
+                    });
+
+                    match &rule.action {
+                        SanitizationAction::Remove => s.clear(),
+                        SanitizationAction::Replace(replacement) => *s = replacement.clone(),
+                        SanitizationAction::Encode => {
+                            // Simple HTML encoding
+                            *s = s
+                                .replace("&", "&amp;")
+                                .replace("<", "&lt;")
+                                .replace(">", "&gt;")
+                                .replace("\"", "&quot;")
+                                .replace("'", "&#39;");
                         }
+                        _ => {}
                     }
                 }
             }
             SanitizationRuleType::Length => {
-                if let Ok(max_len) = rule.pattern.parse::<usize>() {
-                    if s.len() > max_len {
-                        s.truncate(max_len);
-                        issues.push(SanitizationIssue {
-                            issue_type: SanitizationIssueType::ExcessiveLength,
-                            field_path: path.to_string(),
-                            description: format!("Field length exceeded maximum: {max_len}"),
-                            severity: SanitizationSeverity::Low,
-                            action_taken: "Truncated".to_string(),
-                        });
-                    }
+                if let Ok(max_len) = rule.pattern.parse::<usize>()
+                    && s.len() > max_len
+                {
+                    s.truncate(max_len);
+                    issues.push(SanitizationIssue {
+                        issue_type: SanitizationIssueType::ExcessiveLength,
+                        field_path: path.to_string(),
+                        description: format!("Field length exceeded maximum: {max_len}"),
+                        severity: SanitizationSeverity::Low,
+                        action_taken: "Truncated".to_string(),
+                    });
                 }
             }
             _ => {
@@ -680,18 +680,18 @@ impl InputSanitizer {
         ];
 
         for pattern in &xss_patterns {
-            if let Ok(regex) = Regex::new(&format!("(?i){pattern}")) {
-                if regex.is_match(s) {
-                    issues.push(SanitizationIssue {
-                        issue_type: SanitizationIssueType::XssAttempt,
-                        field_path: path.to_string(),
-                        description: format!("Potential XSS attempt detected: {pattern}"),
-                        severity: SanitizationSeverity::High,
-                        action_taken: "Content sanitized".to_string(),
-                    });
+            if let Ok(regex) = Regex::new(&format!("(?i){pattern}"))
+                && regex.is_match(s)
+            {
+                issues.push(SanitizationIssue {
+                    issue_type: SanitizationIssueType::XssAttempt,
+                    field_path: path.to_string(),
+                    description: format!("Potential XSS attempt detected: {pattern}"),
+                    severity: SanitizationSeverity::High,
+                    action_taken: "Content sanitized".to_string(),
+                });
 
-                    *s = regex.replace_all(s, "").to_string();
-                }
+                *s = regex.replace_all(s, "").to_string();
             }
         }
     }
@@ -699,18 +699,18 @@ impl InputSanitizer {
     /// Sanitize HTML content
     fn sanitize_html(&self, s: &mut String, path: &str, issues: &mut Vec<SanitizationIssue>) {
         // Simple HTML tag removal - in production use a proper HTML sanitizer
-        if let Ok(regex) = Regex::new(r"<[^>]*>") {
-            if regex.is_match(s) {
-                issues.push(SanitizationIssue {
-                    issue_type: SanitizationIssueType::MaliciousContent,
-                    field_path: path.to_string(),
-                    description: "HTML tags detected and removed".to_string(),
-                    severity: SanitizationSeverity::Medium,
-                    action_taken: "HTML tags removed".to_string(),
-                });
+        if let Ok(regex) = Regex::new(r"<[^>]*>")
+            && regex.is_match(s)
+        {
+            issues.push(SanitizationIssue {
+                issue_type: SanitizationIssueType::MaliciousContent,
+                field_path: path.to_string(),
+                description: "HTML tags detected and removed".to_string(),
+                severity: SanitizationSeverity::Medium,
+                action_taken: "HTML tags removed".to_string(),
+            });
 
-                *s = regex.replace_all(s, "").to_string();
-            }
+            *s = regex.replace_all(s, "").to_string();
         }
     }
 
@@ -732,18 +732,18 @@ impl InputSanitizer {
         ];
 
         for pattern in &sql_patterns {
-            if let Ok(regex) = Regex::new(pattern) {
-                if regex.is_match(s) {
-                    issues.push(SanitizationIssue {
-                        issue_type: SanitizationIssueType::SqlInjection,
-                        field_path: path.to_string(),
-                        description: format!("Potential SQL injection detected: {pattern}"),
-                        severity: SanitizationSeverity::Critical,
-                        action_taken: "Content sanitized".to_string(),
-                    });
+            if let Ok(regex) = Regex::new(pattern)
+                && regex.is_match(s)
+            {
+                issues.push(SanitizationIssue {
+                    issue_type: SanitizationIssueType::SqlInjection,
+                    field_path: path.to_string(),
+                    description: format!("Potential SQL injection detected: {pattern}"),
+                    severity: SanitizationSeverity::Critical,
+                    action_taken: "Content sanitized".to_string(),
+                });
 
-                    *s = regex.replace_all(s, "").to_string();
-                }
+                *s = regex.replace_all(s, "").to_string();
             }
         }
     }
@@ -758,18 +758,18 @@ impl InputSanitizer {
         let traversal_patterns = [r"\.\.\/", r"\.\.\\", r"%2e%2e%2f", r"%2e%2e%5c"];
 
         for pattern in &traversal_patterns {
-            if let Ok(regex) = Regex::new(&format!("(?i){pattern}")) {
-                if regex.is_match(s) {
-                    issues.push(SanitizationIssue {
-                        issue_type: SanitizationIssueType::PathTraversal,
-                        field_path: path.to_string(),
-                        description: format!("Path traversal attempt detected: {pattern}"),
-                        severity: SanitizationSeverity::High,
-                        action_taken: "Content sanitized".to_string(),
-                    });
+            if let Ok(regex) = Regex::new(&format!("(?i){pattern}"))
+                && regex.is_match(s)
+            {
+                issues.push(SanitizationIssue {
+                    issue_type: SanitizationIssueType::PathTraversal,
+                    field_path: path.to_string(),
+                    description: format!("Path traversal attempt detected: {pattern}"),
+                    severity: SanitizationSeverity::High,
+                    action_taken: "Content sanitized".to_string(),
+                });
 
-                    *s = regex.replace_all(s, "").to_string();
-                }
+                *s = regex.replace_all(s, "").to_string();
             }
         }
     }
@@ -810,10 +810,12 @@ mod tests {
 
         let result = sanitizer.sanitize(&malicious_data);
         assert!(!result.issues.is_empty());
-        assert!(result
-            .issues
-            .iter()
-            .any(|issue| matches!(issue.issue_type, SanitizationIssueType::XssAttempt)));
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|issue| matches!(issue.issue_type, SanitizationIssueType::XssAttempt))
+        );
     }
 
     #[test]
@@ -827,10 +829,12 @@ mod tests {
 
         let result = sanitizer.sanitize(&malicious_data);
         assert!(!result.issues.is_empty());
-        assert!(result
-            .issues
-            .iter()
-            .any(|issue| matches!(issue.issue_type, SanitizationIssueType::SqlInjection)));
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|issue| matches!(issue.issue_type, SanitizationIssueType::SqlInjection))
+        );
     }
 
     #[test]
@@ -844,10 +848,12 @@ mod tests {
 
         let result = sanitizer.sanitize(&malicious_data);
         assert!(!result.issues.is_empty());
-        assert!(result
-            .issues
-            .iter()
-            .any(|issue| matches!(issue.issue_type, SanitizationIssueType::PathTraversal)));
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|issue| matches!(issue.issue_type, SanitizationIssueType::PathTraversal))
+        );
     }
 
     #[test]
@@ -861,10 +867,12 @@ mod tests {
 
         let result = sanitizer.sanitize(&data);
         assert!(!result.issues.is_empty());
-        assert!(result
-            .issues
-            .iter()
-            .any(|issue| matches!(issue.issue_type, SanitizationIssueType::ExcessiveLength)));
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|issue| matches!(issue.issue_type, SanitizationIssueType::ExcessiveLength))
+        );
     }
 
     #[test]

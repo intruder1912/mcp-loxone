@@ -280,7 +280,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "      • send_command('security', 'arm') -> Would be queued with high priority"
             );
-            println!("      • send_command('alarm', 'emergency') -> Would be queued with critical priority");
+            println!(
+                "      • send_command('alarm', 'emergency') -> Would be queued with critical priority"
+            );
 
             // Show queue statistics
             if let Some(stats) = client.get_queue_stats().await {

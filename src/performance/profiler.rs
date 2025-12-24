@@ -569,31 +569,31 @@ impl PerformanceProfiler {
         let mut bottlenecks = Vec::new();
 
         // Check latency bottleneck
-        if let Some(duration) = timing.get_duration() {
-            if duration > self.config.bottleneck_detection.latency_threshold {
-                bottlenecks.push(Bottleneck {
-                    bottleneck_type: BottleneckType::HighLatency,
-                    severity: self.get_latency_severity(duration),
-                    description: format!("High latency detected: {duration:?}"),
-                    location: context.operation_type.clone(),
-                    trigger_value: duration.as_millis() as f64,
-                    threshold: self
-                        .config
-                        .bottleneck_detection
-                        .latency_threshold
-                        .as_millis() as f64,
-                    suggestions: vec![
-                        "Consider optimizing the algorithm".to_string(),
-                        "Check for blocking operations".to_string(),
-                        "Review database queries".to_string(),
-                    ],
-                    first_detected: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_nanos() as u64,
-                    occurrences: 1,
-                });
-            }
+        if let Some(duration) = timing.get_duration()
+            && duration > self.config.bottleneck_detection.latency_threshold
+        {
+            bottlenecks.push(Bottleneck {
+                bottleneck_type: BottleneckType::HighLatency,
+                severity: self.get_latency_severity(duration),
+                description: format!("High latency detected: {duration:?}"),
+                location: context.operation_type.clone(),
+                trigger_value: duration.as_millis() as f64,
+                threshold: self
+                    .config
+                    .bottleneck_detection
+                    .latency_threshold
+                    .as_millis() as f64,
+                suggestions: vec![
+                    "Consider optimizing the algorithm".to_string(),
+                    "Check for blocking operations".to_string(),
+                    "Review database queries".to_string(),
+                ],
+                first_detected: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos() as u64,
+                occurrences: 1,
+            });
         }
 
         // Check CPU bottleneck

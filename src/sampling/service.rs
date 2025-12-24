@@ -503,9 +503,11 @@ mod tests {
         let service = SamplingService::new(client, client_context, config);
         let capabilities = service.get_capabilities();
 
-        assert!(capabilities
-            .supported_scenarios
-            .contains(&"general_automation".to_string()));
+        assert!(
+            capabilities
+                .supported_scenarios
+                .contains(&"general_automation".to_string())
+        );
     }
 
     #[tokio::test]

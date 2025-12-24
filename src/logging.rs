@@ -13,9 +13,9 @@ pub mod structured;
 use std::path::PathBuf;
 use tracing::Level;
 use tracing_subscriber::{
+    EnvFilter,
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
-    EnvFilter,
 };
 
 /// Logging configuration

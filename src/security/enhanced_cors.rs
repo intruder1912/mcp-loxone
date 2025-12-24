@@ -347,15 +347,15 @@ impl EnhancedCorsMiddleware {
         }
 
         // Check if origin is blocked
-        if let Some(origin) = &context.origin {
-            if self.is_origin_blocked(origin).await {
-                let mut stats = self.stats.write().await;
-                stats.blocked_requests += 1;
-                return EnhancedCorsResult::Blocked {
-                    reason: "Origin is blocked due to previous security violations".to_string(),
-                    severity: "high".to_string(),
-                };
-            }
+        if let Some(origin) = &context.origin
+            && self.is_origin_blocked(origin).await
+        {
+            let mut stats = self.stats.write().await;
+            stats.blocked_requests += 1;
+            return EnhancedCorsResult::Blocked {
+                reason: "Origin is blocked due to previous security violations".to_string(),
+                severity: "high".to_string(),
+            };
         }
 
         // Validate request context
@@ -457,14 +457,14 @@ impl EnhancedCorsMiddleware {
         }
 
         // Check header count
-        if let Some(max_headers) = self.config.context_validation.max_headers {
-            if context.headers.len() > max_headers {
-                return Some(format!(
-                    "Too many headers: {} > {}",
-                    context.headers.len(),
-                    max_headers
-                ));
-            }
+        if let Some(max_headers) = self.config.context_validation.max_headers
+            && context.headers.len() > max_headers
+        {
+            return Some(format!(
+                "Too many headers: {} > {}",
+                context.headers.len(),
+                max_headers
+            ));
         }
 
         // Check header lengths
@@ -482,12 +482,11 @@ impl EnhancedCorsMiddleware {
         }
 
         // Check for suspicious User-Agent
-        if self.config.context_validation.validate_user_agent {
-            if let Some(ua) = &context.user_agent {
-                if self.is_suspicious_user_agent(ua) {
-                    return Some("Suspicious User-Agent detected".to_string());
-                }
-            }
+        if self.config.context_validation.validate_user_agent
+            && let Some(ua) = &context.user_agent
+            && self.is_suspicious_user_agent(ua)
+        {
+            return Some("Suspicious User-Agent detected".to_string());
         }
 
         // Check HTTPS enforcement for credentials
@@ -521,26 +520,26 @@ impl EnhancedCorsMiddleware {
                 cache.get(&cache_key).cloned()
             };
 
-            if let Some(mut entry) = cached_entry {
-                if entry.expires_at > SystemTime::now() {
-                    entry.hit_count += 1;
-                    // Update cache with hit count
-                    {
-                        let mut cache = self.preflight_cache.write().await;
-                        cache.insert(cache_key, entry.clone());
-                    }
-
-                    // Update statistics
-                    {
-                        let mut stats = self.stats.write().await;
-                        stats.cache_hits += 1;
-                    }
-
-                    return EnhancedCorsResult::Preflight {
-                        headers: entry.headers,
-                        cache_duration: Some(self.config.performance.preflight_cache_duration),
-                    };
+            if let Some(mut entry) = cached_entry
+                && entry.expires_at > SystemTime::now()
+            {
+                entry.hit_count += 1;
+                // Update cache with hit count
+                {
+                    let mut cache = self.preflight_cache.write().await;
+                    cache.insert(cache_key, entry.clone());
                 }
+
+                // Update statistics
+                {
+                    let mut stats = self.stats.write().await;
+                    stats.cache_hits += 1;
+                }
+
+                return EnhancedCorsResult::Preflight {
+                    headers: entry.headers,
+                    cache_duration: Some(self.config.performance.preflight_cache_duration),
+                };
             }
         }
 
@@ -759,12 +758,12 @@ impl EnhancedCorsMiddleware {
     /// Extract IP address from origin URL (helper for CIDR checking)
     fn extract_ip_from_origin(origin: &str) -> Option<String> {
         // Parse URL to extract host
-        if let Ok(url) = origin.parse::<url::Url>() {
-            if let Some(host) = url.host_str() {
-                // Check if host is an IP address (contains only digits, dots, and colons)
-                if host.chars().all(|c| c.is_numeric() || c == '.' || c == ':') {
-                    return Some(host.to_string());
-                }
+        if let Ok(url) = origin.parse::<url::Url>()
+            && let Some(host) = url.host_str()
+        {
+            // Check if host is an IP address (contains only digits, dots, and colons)
+            if host.chars().all(|c| c.is_numeric() || c == '.' || c == ':') {
+                return Some(host.to_string());
             }
         }
         None

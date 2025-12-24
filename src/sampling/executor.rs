@@ -317,15 +317,14 @@ impl CommandExecutor {
         }
 
         // Check temperature change limits
-        if command.action == "set_temperature" {
-            if let Some(ref value_str) = command.value {
-                if let Ok(target_temp) = value_str.parse::<f32>() {
-                    // In a real implementation, we'd get current temperature
-                    // For now, assume reasonable limits
-                    if !(15.0..=25.0).contains(&target_temp) {
-                        return true;
-                    }
-                }
+        if command.action == "set_temperature"
+            && let Some(ref value_str) = command.value
+            && let Ok(target_temp) = value_str.parse::<f32>()
+        {
+            // In a real implementation, we'd get current temperature
+            // For now, assume reasonable limits
+            if !(15.0..=25.0).contains(&target_temp) {
+                return true;
             }
         }
 
@@ -449,7 +448,7 @@ impl CommandExecutor {
                 return Err(LoxoneError::Generic(anyhow::anyhow!(
                     "Invalid light action: {}",
                     action
-                )))
+                )));
             }
         };
 
@@ -472,7 +471,7 @@ impl CommandExecutor {
                 return Err(LoxoneError::Generic(anyhow::anyhow!(
                     "Invalid blind action: {}",
                     action
-                )))
+                )));
             }
         };
 

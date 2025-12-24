@@ -273,15 +273,13 @@ impl ResilienceManager {
             }
             FallbackStrategy::Cached => {
                 let cache = self.fallback_cache.read().await;
-                if let Some(cached) = cache.get(service_name) {
-                    if cached.expires_at > chrono::Utc::now() {
-                        info!("Using cached fallback for service: {}", service_name);
-                        return serde_json::from_value(cached.value.clone()).map_err(|e| {
-                            LoxoneError::internal(format!(
-                                "Failed to deserialize cached value: {e}"
-                            ))
-                        });
-                    }
+                if let Some(cached) = cache.get(service_name)
+                    && cached.expires_at > chrono::Utc::now()
+                {
+                    info!("Using cached fallback for service: {}", service_name);
+                    return serde_json::from_value(cached.value.clone()).map_err(|e| {
+                        LoxoneError::internal(format!("Failed to deserialize cached value: {e}"))
+                    });
                 }
                 drop(cache);
 

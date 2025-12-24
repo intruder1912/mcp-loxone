@@ -63,14 +63,14 @@ fn set_version_info() {
         println!("cargo:rustc-env=BUILD_VERSION={version}");
     }
 
-    if let Ok(git_hash) = std::process::Command::new("git")
+    if let Some(git_hash) = std::process::Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()
+        .ok()
+        .filter(|output| output.status.success())
     {
-        if git_hash.status.success() {
-            let hash = String::from_utf8_lossy(&git_hash.stdout);
-            println!("cargo:rustc-env=BUILD_GIT_HASH={}", hash.trim());
-        }
+        let hash = String::from_utf8_lossy(&git_hash.stdout);
+        println!("cargo:rustc-env=BUILD_GIT_HASH={}", hash.trim());
     }
 
     // Build timestamp
@@ -100,7 +100,9 @@ fn setup_macos_codesigning() {
 
     // Provide instructions to the user
     if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "macos" {
-        println!("cargo:warning=macOS detected: Use './cargo-build-sign.sh' or 'make build' for automatic code signing");
+        println!(
+            "cargo:warning=macOS detected: Use './cargo-build-sign.sh' or 'make build' for automatic code signing"
+        );
     }
 }
 

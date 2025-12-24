@@ -1091,12 +1091,15 @@ mod tests {
 
     #[test]
     fn test_provider_factory_config_from_env() {
-        // Set test environment variables
-        env::set_var("OLLAMA_BASE_URL", "http://test:11434");
-        env::set_var("OLLAMA_DEFAULT_MODEL", "test-model");
-        env::set_var("OPENAI_API_KEY", "test-openai-key");
-        env::set_var("ANTHROPIC_API_KEY", "test-anthropic-key");
-        env::set_var("LLM_ENABLE_FALLBACK", "true");
+        // SAFETY: Test runs single-threaded, env modifications are safe
+        unsafe {
+            // Set test environment variables
+            env::set_var("OLLAMA_BASE_URL", "http://test:11434");
+            env::set_var("OLLAMA_DEFAULT_MODEL", "test-model");
+            env::set_var("OPENAI_API_KEY", "test-openai-key");
+            env::set_var("ANTHROPIC_API_KEY", "test-anthropic-key");
+            env::set_var("LLM_ENABLE_FALLBACK", "true");
+        }
 
         let config = ProviderFactoryConfig::from_env();
 
@@ -1107,11 +1110,14 @@ mod tests {
         assert_eq!(config.openai.api_key.unwrap(), "test-openai-key");
         assert_eq!(config.anthropic.api_key.unwrap(), "test-anthropic-key");
 
-        // Clean up environment variables
-        env::remove_var("OLLAMA_BASE_URL");
-        env::remove_var("OLLAMA_DEFAULT_MODEL");
-        env::remove_var("OPENAI_API_KEY");
-        env::remove_var("ANTHROPIC_API_KEY");
-        env::remove_var("LLM_ENABLE_FALLBACK");
+        // SAFETY: Test runs single-threaded, env modifications are safe
+        unsafe {
+            // Clean up environment variables
+            env::remove_var("OLLAMA_BASE_URL");
+            env::remove_var("OLLAMA_DEFAULT_MODEL");
+            env::remove_var("OPENAI_API_KEY");
+            env::remove_var("ANTHROPIC_API_KEY");
+            env::remove_var("LLM_ENABLE_FALLBACK");
+        }
     }
 }

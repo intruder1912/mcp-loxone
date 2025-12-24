@@ -8,11 +8,11 @@
 #![allow(deprecated)]
 
 use aes::{
-    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
     Aes256,
+    cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray},
 };
-use base64::{engine::general_purpose, Engine as _};
-use rand::{thread_rng, RngCore};
+use base64::{Engine as _, engine::general_purpose};
+use rand::{RngCore, thread_rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;

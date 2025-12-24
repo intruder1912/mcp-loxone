@@ -7,7 +7,7 @@ use loxone_mcp_rust::server::rate_limiter::{
     RateLimitConfig, RateLimitMiddleware, RateLimitResult,
 };
 use std::time::Duration;
-use tracing::{info, warn, Level};
+use tracing::{Level, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

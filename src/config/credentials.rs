@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 #[cfg(feature = "infisical")]
-use crate::config::infisical_client::{create_authenticated_client, InfisicalClient};
+use crate::config::infisical_client::{InfisicalClient, create_authenticated_client};
 
 /// Loxone credentials
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,7 +173,7 @@ impl CredentialManager {
 impl CredentialManager {
     async fn store_environment(&self, _credentials: &LoxoneCredentials) -> Result<()> {
         Err(LoxoneError::credentials(
-            "Cannot store credentials in environment variables. Set LOXONE_USER and LOXONE_PASS manually."
+            "Cannot store credentials in environment variables. Set LOXONE_USER and LOXONE_PASS manually.",
         ))
     }
 

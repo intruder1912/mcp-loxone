@@ -11,8 +11,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
-use tokio::time::{interval, Duration};
+use tokio::sync::{RwLock, broadcast};
+use tokio::time::{Duration, interval};
 use tracing::{debug, info, warn};
 
 /// Centralized state manager with change detection
@@ -425,38 +425,38 @@ impl StateManager {
         }
 
         // Check numeric value changes
-        if let (Some(old), Some(new)) = (&old_state.resolved_value, &new_state.resolved_value) {
-            if let (Some(old_val), Some(new_val)) = (old.numeric_value, new.numeric_value) {
-                let change_magnitude = (new_val - old_val).abs();
+        if let (Some(old), Some(new)) = (&old_state.resolved_value, &new_state.resolved_value)
+            && let (Some(old_val), Some(new_val)) = (old.numeric_value, new.numeric_value)
+        {
+            let change_magnitude = (new_val - old_val).abs();
 
-                // Temperature changes
-                if old
-                    .sensor_type
-                    .as_ref()
-                    .map(|t| format!("{t:?}"))
-                    .unwrap_or_default()
-                    .contains("Temperature")
-                {
-                    if change_magnitude > 2.0 {
-                        return ChangeSignificance::Major;
-                    } else if change_magnitude > 0.5 {
-                        return ChangeSignificance::Minor;
-                    }
-                }
-
-                // Percentage-based sensors (humidity, dimmer, etc.)
-                if old.unit.as_ref().map(|u| u.contains('%')).unwrap_or(false) {
-                    if change_magnitude > 20.0 {
-                        return ChangeSignificance::Major;
-                    } else if change_magnitude > 5.0 {
-                        return ChangeSignificance::Minor;
-                    }
-                }
-
-                // Binary sensors (on/off, open/closed)
-                if (old_val == 0.0 && new_val > 0.0) || (old_val > 0.0 && new_val == 0.0) {
+            // Temperature changes
+            if old
+                .sensor_type
+                .as_ref()
+                .map(|t| format!("{t:?}"))
+                .unwrap_or_default()
+                .contains("Temperature")
+            {
+                if change_magnitude > 2.0 {
                     return ChangeSignificance::Major;
+                } else if change_magnitude > 0.5 {
+                    return ChangeSignificance::Minor;
                 }
+            }
+
+            // Percentage-based sensors (humidity, dimmer, etc.)
+            if old.unit.as_ref().map(|u| u.contains('%')).unwrap_or(false) {
+                if change_magnitude > 20.0 {
+                    return ChangeSignificance::Major;
+                } else if change_magnitude > 5.0 {
+                    return ChangeSignificance::Minor;
+                }
+            }
+
+            // Binary sensors (on/off, open/closed)
+            if (old_val == 0.0 && new_val > 0.0) || (old_val > 0.0 && new_val == 0.0) {
+                return ChangeSignificance::Major;
             }
         }
 
@@ -486,28 +486,28 @@ impl StateManager {
 
         // Device-specific notification
         let device_subs = self.subscription_manager.device_subscriptions.read().await;
-        if let Some(sender) = device_subs.get(&event.device_uuid) {
-            if let Err(e) = sender.send(event.clone()) {
-                debug!("No device subscribers for {}: {}", event.device_uuid, e);
-            }
+        if let Some(sender) = device_subs.get(&event.device_uuid)
+            && let Err(e) = sender.send(event.clone())
+        {
+            debug!("No device subscribers for {}: {}", event.device_uuid, e);
         }
 
         // Room-specific notification
         if let Some(room) = &event.room {
             let room_subs = self.subscription_manager.room_subscriptions.read().await;
-            if let Some(sender) = room_subs.get(room) {
-                if let Err(e) = sender.send(event.clone()) {
-                    debug!("No room subscribers for {}: {}", room, e);
-                }
+            if let Some(sender) = room_subs.get(room)
+                && let Err(e) = sender.send(event.clone())
+            {
+                debug!("No room subscribers for {}: {}", room, e);
             }
         }
 
         // Type-specific notification
         let type_subs = self.subscription_manager.type_subscriptions.read().await;
-        if let Some(sender) = type_subs.get(&event.device_type) {
-            if let Err(e) = sender.send(event.clone()) {
-                debug!("No type subscribers for {}: {}", event.device_type, e);
-            }
+        if let Some(sender) = type_subs.get(&event.device_type)
+            && let Err(e) = sender.send(event.clone())
+        {
+            debug!("No type subscribers for {}: {}", event.device_type, e);
         }
 
         Ok(())

@@ -472,10 +472,10 @@ where
 {
     fn drop(&mut self) {
         // Cancel background cleanup task
-        if let Ok(mut handle_guard) = self.cleanup_handle.try_write() {
-            if let Some(handle) = handle_guard.take() {
-                handle.abort();
-            }
+        if let Ok(mut handle_guard) = self.cleanup_handle.try_write()
+            && let Some(handle) = handle_guard.take()
+        {
+            handle.abort();
         }
     }
 }
@@ -508,7 +508,7 @@ pub fn create_cache_key(tool_name: &str, params: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     #[tokio::test]
     async fn test_cache_basic_operations() {

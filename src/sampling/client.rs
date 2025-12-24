@@ -177,7 +177,10 @@ impl SamplingClient for MockSamplingClient {
                 &self.provider_type,
             )
         } else {
-            format!("I understand your automation request. This is a {} mock response. For real AI-powered automation suggestions, please configure actual {} API credentials.", self.provider_type, self.provider_type)
+            format!(
+                "I understand your automation request. This is a {} mock response. For real AI-powered automation suggestions, please configure actual {} API credentials.",
+                self.provider_type, self.provider_type
+            )
         };
 
         let model_name = match self.provider_type.as_str() {
@@ -246,11 +249,17 @@ fn generate_mock_response_for_provider(
 
     // Determine the type of request
     if user_lower.contains("cozy") {
-        format!("{provider_icon} Creating a Cozy Atmosphere ({provider_name} Mock Response)\n\nBased on your request, I recommend dimming lights to 30%, adjusting temperature to 22°C, and partially closing blinds for intimacy.\n\n*Note: This is a {provider_type} mock response. Configure actual {provider_type} credentials for real AI-powered suggestions.*")
+        format!(
+            "{provider_icon} Creating a Cozy Atmosphere ({provider_name} Mock Response)\n\nBased on your request, I recommend dimming lights to 30%, adjusting temperature to 22°C, and partially closing blinds for intimacy.\n\n*Note: This is a {provider_type} mock response. Configure actual {provider_type} credentials for real AI-powered suggestions.*"
+        )
     } else if user_lower.contains("event") || user_lower.contains("party") {
-        format!("{provider_icon} Event Preparation ({provider_name} Mock Response)\n\nFor your event, I suggest bright entrance lighting, appropriate room temperature, and testing all critical systems.\n\n*Note: This is a {provider_type} mock response. Configure actual {provider_type} credentials for real AI-powered suggestions.*")
+        format!(
+            "{provider_icon} Event Preparation ({provider_name} Mock Response)\n\nFor your event, I suggest bright entrance lighting, appropriate room temperature, and testing all critical systems.\n\n*Note: This is a {provider_type} mock response. Configure actual {provider_type} credentials for real AI-powered suggestions.*"
+        )
     } else {
-        format!("{provider_icon} Home Automation Suggestion ({provider_name} Mock Response)\n\nI understand you'd like help with your home automation. For intelligent, context-aware suggestions, configure actual {provider_type} credentials.\n\n*Current Status: Using {provider_type} simulation for development/testing.*")
+        format!(
+            "{provider_icon} Home Automation Suggestion ({provider_name} Mock Response)\n\nI understand you'd like help with your home automation. For intelligent, context-aware suggestions, configure actual {provider_type} credentials.\n\n*Current Status: Using {provider_type} simulation for development/testing.*"
+        )
     }
 }
 
@@ -415,13 +424,12 @@ impl SamplingClientManager {
             .primary_client
             .as_any()
             .downcast_ref::<MockSamplingClient>()
+            && !mock_client.health_check().await
         {
-            if !mock_client.health_check().await {
-                return Err(LoxoneError::ServiceUnavailable(format!(
-                    "{} provider is currently unhealthy",
-                    mock_client.provider_type()
-                )));
-            }
+            return Err(LoxoneError::ServiceUnavailable(format!(
+                "{} provider is currently unhealthy",
+                mock_client.provider_type()
+            )));
         }
 
         self.primary_client.create_message(request.clone()).await
@@ -434,13 +442,13 @@ impl SamplingClientManager {
         request: &SamplingRequest,
     ) -> Result<SamplingResponse> {
         // Check health of fallback provider if it's a mock client with health check capability
-        if let Some(mock_client) = client.as_any().downcast_ref::<MockSamplingClient>() {
-            if !mock_client.health_check().await {
-                return Err(LoxoneError::ServiceUnavailable(format!(
-                    "{} fallback provider is currently unhealthy",
-                    mock_client.provider_type()
-                )));
-            }
+        if let Some(mock_client) = client.as_any().downcast_ref::<MockSamplingClient>()
+            && !mock_client.health_check().await
+        {
+            return Err(LoxoneError::ServiceUnavailable(format!(
+                "{} fallback provider is currently unhealthy",
+                mock_client.provider_type()
+            )));
         }
 
         client.create_message(request.clone()).await

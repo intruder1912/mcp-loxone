@@ -38,7 +38,7 @@ pub struct AuthToken {
 
 // OpenSSL implementation (modern, battle-tested, Send + Sync)
 #[cfg(feature = "crypto-openssl")]
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 #[cfg(feature = "crypto-openssl")]
 use openssl::pkey::PKey;
 #[cfg(feature = "crypto-openssl")]
@@ -89,24 +89,24 @@ impl LoxoneAuth {
     /// Set the RSA public key from server certificate or raw public key
     pub fn set_public_key(&mut self, certificate_pem: &str) -> Result<()> {
         // Try parsing as X.509 certificate first
-        if let Ok((_, pem)) = parse_x509_pem(certificate_pem.as_bytes()) {
-            if let Ok((_, cert)) = parse_x509_certificate(&pem.contents) {
-                // Extract public key from certificate
-                let public_key_info = cert.public_key();
-                let public_key_der = &public_key_info.subject_public_key.data;
+        if let Ok((_, pem)) = parse_x509_pem(certificate_pem.as_bytes())
+            && let Ok((_, cert)) = parse_x509_certificate(&pem.contents)
+        {
+            // Extract public key from certificate
+            let public_key_info = cert.public_key();
+            let public_key_der = &public_key_info.subject_public_key.data;
 
-                // Parse DER-encoded public key
-                let rsa_key = Rsa::public_key_from_der(public_key_der).map_err(|e| {
-                    LoxoneError::crypto(format!("Failed to parse RSA key from certificate: {e}"))
-                })?;
+            // Parse DER-encoded public key
+            let rsa_key = Rsa::public_key_from_der(public_key_der).map_err(|e| {
+                LoxoneError::crypto(format!("Failed to parse RSA key from certificate: {e}"))
+            })?;
 
-                self.public_key = Some(
-                    PKey::from_rsa(rsa_key)
-                        .map_err(|e| LoxoneError::crypto(format!("Failed to create PKey: {e}")))?,
-                );
+            self.public_key = Some(
+                PKey::from_rsa(rsa_key)
+                    .map_err(|e| LoxoneError::crypto(format!("Failed to create PKey: {e}")))?,
+            );
 
-                return Ok(());
-            }
+            return Ok(());
         }
 
         // If certificate parsing fails, try parsing as raw RSA public key
@@ -219,30 +219,30 @@ impl Default for LoxoneAuth {
 #[cfg(feature = "crypto-openssl")]
 pub fn get_public_key_from_certificate(certificate_pem: &str) -> Result<LoxonePublicKey> {
     // Try parsing as X.509 certificate first
-    if let Ok((_, pem)) = parse_x509_pem(certificate_pem.as_bytes()) {
-        if let Ok((_, cert)) = parse_x509_certificate(&pem.contents) {
-            // Extract public key from certificate
-            let public_key_info = cert.public_key();
-            let public_key_der = &public_key_info.subject_public_key.data;
+    if let Ok((_, pem)) = parse_x509_pem(certificate_pem.as_bytes())
+        && let Ok((_, cert)) = parse_x509_certificate(&pem.contents)
+    {
+        // Extract public key from certificate
+        let public_key_info = cert.public_key();
+        let public_key_der = &public_key_info.subject_public_key.data;
 
-            // Parse DER-encoded RSA public key
-            let rsa_key = Rsa::public_key_from_der(public_key_der).map_err(|e| {
-                LoxoneError::crypto(format!("Failed to parse RSA key from certificate: {e}"))
-            })?;
+        // Parse DER-encoded RSA public key
+        let rsa_key = Rsa::public_key_from_der(public_key_der).map_err(|e| {
+            LoxoneError::crypto(format!("Failed to parse RSA key from certificate: {e}"))
+        })?;
 
-            // Extract n and e components
-            let n = rsa_key.n();
-            let e = rsa_key.e();
+        // Extract n and e components
+        let n = rsa_key.n();
+        let e = rsa_key.e();
 
-            // Convert to base64
-            let n_base64 = general_purpose::STANDARD.encode(n.to_vec());
-            let e_base64 = general_purpose::STANDARD.encode(e.to_vec());
+        // Convert to base64
+        let n_base64 = general_purpose::STANDARD.encode(n.to_vec());
+        let e_base64 = general_purpose::STANDARD.encode(e.to_vec());
 
-            return Ok(LoxonePublicKey {
-                n: n_base64,
-                e: e_base64,
-            });
-        }
+        return Ok(LoxonePublicKey {
+            n: n_base64,
+            e: e_base64,
+        });
     }
 
     // If certificate parsing fails, try parsing as raw RSA public key
@@ -344,7 +344,7 @@ impl TokenAuthClient {
     pub async fn authenticate(&mut self, username: &str, password: &str) -> Result<()> {
         // Store username for later use
         self.username = username.to_string();
-        use openssl::hash::{hash, MessageDigest};
+        use openssl::hash::{MessageDigest, hash};
         use openssl::pkey::PKey;
         use openssl::sign::Signer;
 

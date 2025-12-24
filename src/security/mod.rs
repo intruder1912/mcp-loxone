@@ -7,7 +7,6 @@ pub mod enhanced_validation;
 pub mod headers;
 pub mod input_sanitization;
 pub mod key_store;
-pub mod middleware;
 pub mod policy;
 pub mod rate_limiting;
 

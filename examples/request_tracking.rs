@@ -5,7 +5,7 @@
 
 use loxone_mcp_rust::server::request_context::{RequestContext, RequestTracker};
 use serde_json::json;
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

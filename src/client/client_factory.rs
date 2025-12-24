@@ -8,7 +8,7 @@ use crate::client::LoxoneWebSocketClient;
 #[cfg(feature = "crypto-openssl")]
 use crate::client::TokenHttpClient;
 use crate::client::{LoxoneClient, LoxoneHttpClient};
-use crate::config::{credentials::LoxoneCredentials, AuthMethod, LoxoneConfig};
+use crate::config::{AuthMethod, LoxoneConfig, credentials::LoxoneCredentials};
 use crate::error::{LoxoneError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -320,37 +320,35 @@ impl ClientFactory for AdaptiveClientFactory {
         .await
         {
             Ok(Ok(response)) => {
-                if response.status().is_success() {
-                    if let Ok(text) = response.text().await {
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            if let Some(version) = json
-                                .get("LL")
-                                .and_then(|v| v.get("value"))
-                                .and_then(|v| v.as_str())
-                            {
-                                capabilities.server_version = Some(version.to_string());
-                                info!("Detected Loxone Miniserver version: {}", version);
+                if response.status().is_success()
+                    && let Ok(text) = response.text().await
+                    && let Ok(json) = serde_json::from_str::<serde_json::Value>(&text)
+                    && let Some(version) = json
+                        .get("LL")
+                        .and_then(|v| v.get("value"))
+                        .and_then(|v| v.as_str())
+                {
+                    capabilities.server_version = Some(version.to_string());
+                    info!("Detected Loxone Miniserver version: {}", version);
 
-                                // Parse version to determine generation
-                                if let Some(major_version) = version
-                                    .split('.')
-                                    .next()
-                                    .and_then(|v| v.parse::<u32>().ok())
-                                {
-                                    if major_version < 9 {
-                                        info!("Detected Gen 1 Miniserver (version < 9), disabling token auth probing");
-                                        // Skip token auth probe for Gen 1 to avoid potential lockouts
-                                        capabilities.supports_token_auth = false;
-                                        capabilities.encryption_level = EncryptionLevel::None;
-                                    } else {
-                                        // Gen 2+ - probe for token auth
-                                        capabilities.supports_token_auth =
-                                            self.probe_token_auth(config).await;
-                                        if capabilities.supports_token_auth {
-                                            capabilities.encryption_level = EncryptionLevel::Aes;
-                                        }
-                                    }
-                                }
+                    // Parse version to determine generation
+                    if let Some(major_version) = version
+                        .split('.')
+                        .next()
+                        .and_then(|v| v.parse::<u32>().ok())
+                    {
+                        if major_version < 9 {
+                            info!(
+                                "Detected Gen 1 Miniserver (version < 9), disabling token auth probing"
+                            );
+                            // Skip token auth probe for Gen 1 to avoid potential lockouts
+                            capabilities.supports_token_auth = false;
+                            capabilities.encryption_level = EncryptionLevel::None;
+                        } else {
+                            // Gen 2+ - probe for token auth
+                            capabilities.supports_token_auth = self.probe_token_auth(config).await;
+                            if capabilities.supports_token_auth {
+                                capabilities.encryption_level = EncryptionLevel::Aes;
                             }
                         }
                     }

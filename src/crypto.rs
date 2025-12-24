@@ -4,8 +4,8 @@
 
 #[cfg(feature = "crypto-openssl")]
 pub use crate::client::auth::{
-    encrypt_credentials, get_public_key_from_certificate, AuthToken, LoxoneAuth, LoxonePublicKey,
-    TokenAuthClient,
+    AuthToken, LoxoneAuth, LoxonePublicKey, TokenAuthClient, encrypt_credentials,
+    get_public_key_from_certificate,
 };
 
 #[cfg(not(feature = "crypto-openssl"))]

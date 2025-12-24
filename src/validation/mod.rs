@@ -3,7 +3,6 @@
 //! This module provides comprehensive validation middleware for MCP requests,
 //! including schema validation, input sanitization, and security checks.
 
-pub mod middleware;
 pub mod rules;
 pub mod sanitizer;
 pub mod schema;

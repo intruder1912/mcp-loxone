@@ -7,13 +7,13 @@
 //! - serial_test for test isolation
 
 use loxone_mcp_rust::client::create_client;
-use loxone_mcp_rust::config::{credentials::LoxoneCredentials, AuthMethod};
+use loxone_mcp_rust::config::{AuthMethod, credentials::LoxoneCredentials};
 use rstest::*;
 use serial_test::serial;
-use wiremock::{matchers::method, Mock, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate, matchers::method};
 
 mod common;
-use common::{test_fixtures::*, MockLoxoneServer};
+use common::{MockLoxoneServer, test_fixtures::*};
 
 #[rstest]
 #[tokio::test]
@@ -44,7 +44,7 @@ async fn test_basic_auth_with_mock_server() {
 #[rstest]
 #[tokio::test]
 async fn test_token_auth_with_mock_server() {
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     let mock_server = MockLoxoneServer::start().await;
 

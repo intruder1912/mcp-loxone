@@ -382,10 +382,10 @@ impl ResourceMonitor {
         };
 
         let cpu_percent = usage.cpu_percent;
-        if let Some(max_cpu) = self.limits.max_cpu_percent {
-            if cpu_percent > max_cpu * self.limits.cpu_warning_threshold {
-                warnings.push(format!("CPU usage high: {cpu_percent:.1}%"));
-            }
+        if let Some(max_cpu) = self.limits.max_cpu_percent
+            && cpu_percent > max_cpu * self.limits.cpu_warning_threshold
+        {
+            warnings.push(format!("CPU usage high: {cpu_percent:.1}%"));
         }
 
         let request_utilization =

@@ -104,15 +104,15 @@ impl LoxoneMcpServer {
             _ => {
                 return Err(format!(
                     "Invalid action '{action}'. Supported: on, off, dim, bright"
-                ))
+                ));
             }
         };
 
         // Validate brightness
-        if let Some(level) = brightness {
-            if level > 100 {
-                return Err("Brightness must be between 0-100".to_string());
-            }
+        if let Some(level) = brightness
+            && level > 100
+        {
+            return Err("Brightness must be between 0-100".to_string());
         }
 
         Ok(json!({
@@ -274,7 +274,7 @@ impl LoxoneMcpServer {
                 _ => {
                     return Err(format!(
                         "Invalid action '{act}'. Use: up, down, stop, shade"
-                    ))
+                    ));
                 }
             }
         } else {
@@ -475,8 +475,8 @@ impl LoxoneMcpServer {
             "unmute" | "laut" => "unmute",
             _ => {
                 return Err(format!(
-                "Invalid action '{action}'. Use: play, pause, stop, next, previous, mute, unmute"
-            ))
+                    "Invalid action '{action}'. Use: play, pause, stop, next, previous, mute, unmute"
+                ));
             }
         };
 
@@ -798,7 +798,7 @@ impl LoxoneMcpServer {
             _ => {
                 return Err(format!(
                     "Invalid action '{action}'. Use: start, stop, pause"
-                ))
+                ));
             }
         };
 
@@ -877,7 +877,7 @@ impl LoxoneMcpServer {
             _ => {
                 return Err(format!(
                     "Invalid mode '{mode}'. Use: arm_away, arm_home, disarm"
-                ))
+                ));
             }
         };
 
@@ -982,7 +982,7 @@ impl LoxoneMcpServer {
             _ => {
                 return Err(format!(
                     "Invalid action '{action}'. Use: answer, hangup, open, talk, mute"
-                ))
+                ));
             }
         };
 

@@ -10,7 +10,7 @@ use loxone_mcp_rust::server::health_check::{HealthCheckConfig, HealthChecker, He
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 /// Mock client for demonstration
 struct MockLoxoneClient {

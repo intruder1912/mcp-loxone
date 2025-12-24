@@ -3,14 +3,14 @@
 //! Tests various edge cases, error conditions, and resilience scenarios
 //! using the pulseengine-mcp framework and mock infrastructure.
 
+use loxone_mcp_rust::ServerConfig;
 use loxone_mcp_rust::config::CredentialStore;
 use loxone_mcp_rust::server::framework_backend::LoxoneFrameworkBackend;
-use loxone_mcp_rust::ServerConfig;
 use rstest::*;
-use wiremock::{matchers::method, Mock, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate, matchers::method};
 
 mod common;
-use common::{containers::ContainerTestEnvironment, MockLoxoneServer};
+use common::{MockLoxoneServer, containers::ContainerTestEnvironment};
 
 #[rstest]
 #[tokio::test]

@@ -8,10 +8,10 @@ use chrono::{DateTime, Duration, Utc};
 use md5;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
-use tokio::time::{interval, sleep, Duration as TokioDuration, Instant};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use tokio::sync::{Mutex, RwLock, broadcast, mpsc};
+use tokio::time::{Duration as TokioDuration, Instant, interval, sleep};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -871,11 +871,11 @@ impl WebSocketResilienceManager {
         // Spawn task to handle sending messages
         tokio::spawn(async move {
             while let Some(msg) = receiver.recv().await {
-                if let Ok(text) = serde_json::to_string(&msg) {
-                    if let Err(e) = ws_sender.send(Message::Text(text)).await {
-                        tracing::error!("Failed to send WebSocket message: {}", e);
-                        break;
-                    }
+                if let Ok(text) = serde_json::to_string(&msg)
+                    && let Err(e) = ws_sender.send(Message::Text(text)).await
+                {
+                    tracing::error!("Failed to send WebSocket message: {}", e);
+                    break;
                 }
             }
         });

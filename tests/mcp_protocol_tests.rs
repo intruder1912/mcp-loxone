@@ -9,7 +9,7 @@ use rstest::*;
 use serial_test::serial;
 
 mod common;
-use common::{test_fixtures::test_server_config, MockLoxoneServer};
+use common::{MockLoxoneServer, test_fixtures::test_server_config};
 
 #[rstest]
 #[tokio::test]

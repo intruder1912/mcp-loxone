@@ -336,20 +336,20 @@ impl CommandExtractor {
         // Pattern for temperature values
         let re = Regex::new(r"(\d+(?:\.\d+)?)\s*°?[CcFf]?").ok()?;
 
-        if let Some(caps) = re.captures(text) {
-            if let Some(temp_match) = caps.get(1) {
-                let temp_str = temp_match.as_str();
+        if let Some(caps) = re.captures(text)
+            && let Some(temp_match) = caps.get(1)
+        {
+            let temp_str = temp_match.as_str();
 
-                // Check if it's Fahrenheit and convert
-                if text.to_lowercase().contains('f') || text.to_lowercase().contains("fahrenheit") {
-                    if let Ok(f) = temp_str.parse::<f32>() {
-                        let c = (f - 32.0) * 5.0 / 9.0;
-                        return Some(format!("{c:.1}"));
-                    }
-                }
-
-                return Some(temp_str.to_string());
+            // Check if it's Fahrenheit and convert
+            if (text.to_lowercase().contains('f') || text.to_lowercase().contains("fahrenheit"))
+                && let Ok(f) = temp_str.parse::<f32>()
+            {
+                let c = (f - 32.0) * 5.0 / 9.0;
+                return Some(format!("{c:.1}"));
             }
+
+            return Some(temp_str.to_string());
         }
 
         None
@@ -367,14 +367,12 @@ impl CommandExtractor {
 
         // Look for numeric values that could be percentages
         let re_num = Regex::new(r"(\d+)").ok()?;
-        if let Some(caps) = re_num.captures(text) {
-            if let Some(num_str) = caps.get(1).map(|m| m.as_str()) {
-                if let Ok(num) = num_str.parse::<u32>() {
-                    if num <= 100 {
-                        return Some(num_str.to_string());
-                    }
-                }
-            }
+        if let Some(caps) = re_num.captures(text)
+            && let Some(num_str) = caps.get(1).map(|m| m.as_str())
+            && let Ok(num) = num_str.parse::<u32>()
+            && num <= 100
+        {
+            return Some(num_str.to_string());
         }
 
         None
@@ -406,10 +404,10 @@ impl CommandExtractor {
             let line = line.trim();
 
             // Look for recommendation patterns
-            if self.is_recommendation_line(line) {
-                if let Some(rec) = self.parse_recommendation(line) {
-                    recommendations.push(rec);
-                }
+            if self.is_recommendation_line(line)
+                && let Some(rec) = self.parse_recommendation(line)
+            {
+                recommendations.push(rec);
             }
         }
 
@@ -657,7 +655,7 @@ mod tests {
         let recommendations = extractor.extract_recommendations(text);
 
         assert_eq!(recommendations.len(), 4); // "I recommend:" is also treated as a recommendation
-                                              // The actual recommendations start from index 1
+        // The actual recommendations start from index 1
         assert!(recommendations[1].automatable);
     }
 }

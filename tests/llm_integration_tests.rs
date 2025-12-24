@@ -9,10 +9,10 @@
 
 use loxone_mcp_rust::error::LoxoneError;
 use loxone_mcp_rust::sampling::{
+    SamplingMessage, SamplingRequest,
     client::{MockSamplingClient, SamplingClient, SamplingClientManager},
     config::ProviderFactoryConfig,
     protocol::SamplingProtocolIntegration,
-    SamplingMessage, SamplingRequest,
 };
 use serial_test::serial;
 use std::env;

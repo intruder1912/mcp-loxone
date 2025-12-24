@@ -3,14 +3,14 @@
 //! This module provides a local web dashboard with real-time charts and metrics visualization.
 
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     response::{
-        sse::{Event, Sse},
         Html, IntoResponse, Response,
+        sse::{Event, Sse},
     },
     routing::get,
-    Router,
 };
 use futures_util::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
@@ -157,7 +157,7 @@ async fn api_historical_metrics(
                         StatusCode::BAD_REQUEST,
                         "Invalid date format. Use ISO 8601.",
                     )
-                        .into_response()
+                        .into_response();
                 }
             }
         } else {

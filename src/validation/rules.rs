@@ -233,60 +233,60 @@ impl ValidationRule for RateLimitRule {
             .and_then(|m| m.as_str())
             .unwrap_or("unknown");
 
-        if let Some(client_info) = &context.client_info {
-            if let Some(rate_limit) = &client_info.rate_limit_info {
-                // Check if rate limit is exceeded
-                if rate_limit.current_requests >= rate_limit.max_requests {
-                    let reset_time = rate_limit.reset_time;
-                    let now = chrono::Utc::now();
+        if let Some(client_info) = &context.client_info
+            && let Some(rate_limit) = &client_info.rate_limit_info
+        {
+            // Check if rate limit is exceeded
+            if rate_limit.current_requests >= rate_limit.max_requests {
+                let reset_time = rate_limit.reset_time;
+                let now = chrono::Utc::now();
 
-                    if now < reset_time {
-                        return Ok(ValidationResult::failure(vec![ValidationError {
-                            field: "rate_limit".to_string(),
-                            message: format!(
-                                "Rate limit exceeded: {}/{} requests in {} seconds",
-                                rate_limit.current_requests,
-                                rate_limit.max_requests,
-                                rate_limit.window_seconds
-                            ),
-                            code: ValidationErrorCode::RateLimit,
-                            expected: Some(format!(
-                                "Max {} requests per {} seconds",
-                                rate_limit.max_requests, rate_limit.window_seconds
-                            )),
-                            actual: Some(format!("{} requests", rate_limit.current_requests)),
-                            suggestion: Some(format!(
-                                "Wait until {} to make more requests",
-                                reset_time.format("%H:%M:%S")
-                            )),
-                        }]));
-                    }
-                }
-
-                // Different rate limits for different methods
-                let method_limit_factor = match method {
-                    "sampling/createMessage" => 0.1, // Expensive operations get lower limits
-                    "tools/call" => 0.5,
-                    _ => 1.0,
-                };
-
-                let effective_limit = (rate_limit.max_requests as f64 * method_limit_factor) as u32;
-
-                if rate_limit.current_requests >= effective_limit {
+                if now < reset_time {
                     return Ok(ValidationResult::failure(vec![ValidationError {
-                        field: "method_rate_limit".to_string(),
+                        field: "rate_limit".to_string(),
                         message: format!(
-                            "Method '{}' rate limit exceeded: {}/{} requests",
-                            method, rate_limit.current_requests, effective_limit
+                            "Rate limit exceeded: {}/{} requests in {} seconds",
+                            rate_limit.current_requests,
+                            rate_limit.max_requests,
+                            rate_limit.window_seconds
                         ),
                         code: ValidationErrorCode::RateLimit,
                         expected: Some(format!(
-                            "Max {effective_limit} requests for method '{method}'"
+                            "Max {} requests per {} seconds",
+                            rate_limit.max_requests, rate_limit.window_seconds
                         )),
                         actual: Some(format!("{} requests", rate_limit.current_requests)),
-                        suggestion: Some("Reduce request frequency for this method".to_string()),
+                        suggestion: Some(format!(
+                            "Wait until {} to make more requests",
+                            reset_time.format("%H:%M:%S")
+                        )),
                     }]));
                 }
+            }
+
+            // Different rate limits for different methods
+            let method_limit_factor = match method {
+                "sampling/createMessage" => 0.1, // Expensive operations get lower limits
+                "tools/call" => 0.5,
+                _ => 1.0,
+            };
+
+            let effective_limit = (rate_limit.max_requests as f64 * method_limit_factor) as u32;
+
+            if rate_limit.current_requests >= effective_limit {
+                return Ok(ValidationResult::failure(vec![ValidationError {
+                    field: "method_rate_limit".to_string(),
+                    message: format!(
+                        "Method '{}' rate limit exceeded: {}/{} requests",
+                        method, rate_limit.current_requests, effective_limit
+                    ),
+                    code: ValidationErrorCode::RateLimit,
+                    expected: Some(format!(
+                        "Max {effective_limit} requests for method '{method}'"
+                    )),
+                    actual: Some(format!("{} requests", rate_limit.current_requests)),
+                    suggestion: Some("Reduce request frequency for this method".to_string()),
+                }]));
             }
         }
 
@@ -325,41 +325,40 @@ impl ValidationRule for ResourceAccessRule {
             .unwrap_or("unknown");
 
         // Check resource access for specific methods
-        if method == "resources/read" {
-            if let Some(params) = data.get("params") {
-                if let Some(uri) = params.get("uri").and_then(|u| u.as_str()) {
-                    // Validate URI format and accessibility
-                    if !self.is_valid_resource_uri(uri) {
-                        return Ok(ValidationResult::failure(vec![ValidationError {
-                            field: "uri".to_string(),
-                            message: format!("Invalid resource URI: {uri}"),
-                            code: ValidationErrorCode::InvalidFormat,
-                            expected: Some("Valid resource URI (scheme:path)".to_string()),
-                            actual: Some(uri.to_string()),
-                            suggestion: Some("Use a valid resource URI format".to_string()),
-                        }]));
-                    }
+        if method == "resources/read"
+            && let Some(params) = data.get("params")
+            && let Some(uri) = params.get("uri").and_then(|u| u.as_str())
+        {
+            // Validate URI format and accessibility
+            if !self.is_valid_resource_uri(uri) {
+                return Ok(ValidationResult::failure(vec![ValidationError {
+                    field: "uri".to_string(),
+                    message: format!("Invalid resource URI: {uri}"),
+                    code: ValidationErrorCode::InvalidFormat,
+                    expected: Some("Valid resource URI (scheme:path)".to_string()),
+                    actual: Some(uri.to_string()),
+                    suggestion: Some("Use a valid resource URI format".to_string()),
+                }]));
+            }
 
-                    // Check if resource is accessible based on authentication
-                    let auth_level = context
-                        .client_info
-                        .as_ref()
-                        .map(|info| &info.auth_level)
-                        .unwrap_or(&AuthLevel::None);
+            // Check if resource is accessible based on authentication
+            let auth_level = context
+                .client_info
+                .as_ref()
+                .map(|info| &info.auth_level)
+                .unwrap_or(&AuthLevel::None);
 
-                    if !self.is_resource_accessible(uri, auth_level) {
-                        return Ok(ValidationResult::failure(vec![ValidationError {
-                            field: "resource_access".to_string(),
-                            message: format!("Access denied to resource: {uri}"),
-                            code: ValidationErrorCode::SecurityViolation,
-                            expected: Some("Sufficient privileges for resource".to_string()),
-                            actual: Some(format!("{auth_level:?} authentication")),
-                            suggestion: Some(
-                                "Request access or authenticate with higher privileges".to_string(),
-                            ),
-                        }]));
-                    }
-                }
+            if !self.is_resource_accessible(uri, auth_level) {
+                return Ok(ValidationResult::failure(vec![ValidationError {
+                    field: "resource_access".to_string(),
+                    message: format!("Access denied to resource: {uri}"),
+                    code: ValidationErrorCode::SecurityViolation,
+                    expected: Some("Sufficient privileges for resource".to_string()),
+                    actual: Some(format!("{auth_level:?} authentication")),
+                    suggestion: Some(
+                        "Request access or authenticate with higher privileges".to_string(),
+                    ),
+                }]));
             }
         }
 
@@ -429,14 +428,13 @@ impl ValidationRule for LoxoneSpecificRule {
             .and_then(|m| m.as_str())
             .unwrap_or("unknown");
 
-        if method == "tools/call" {
-            if let Some(params) = data.get("params") {
-                if let Some(tool_name) = params.get("name").and_then(|n| n.as_str()) {
-                    // Validate Loxone-specific tool calls
-                    if let Some(error) = self.validate_loxone_tool_call(tool_name, params) {
-                        return Ok(ValidationResult::failure(vec![error]));
-                    }
-                }
+        if method == "tools/call"
+            && let Some(params) = data.get("params")
+            && let Some(tool_name) = params.get("name").and_then(|n| n.as_str())
+        {
+            // Validate Loxone-specific tool calls
+            if let Some(error) = self.validate_loxone_tool_call(tool_name, params) {
+                return Ok(ValidationResult::failure(vec![error]));
             }
         }
 
@@ -467,35 +465,33 @@ impl LoxoneSpecificRule {
             "get_lights" | "control_light" => {
                 // Validate room parameter if present
                 if let Some(args) = params.get("arguments") {
-                    if let Some(room) = args.get("room").and_then(|r| r.as_str()) {
-                        if !self.is_valid_room_name(room) {
-                            return Some(ValidationError {
-                                field: "arguments.room".to_string(),
-                                message: format!("Invalid room name: {room}"),
-                                code: ValidationErrorCode::InvalidFormat,
-                                expected: Some("Valid Loxone room name".to_string()),
-                                actual: Some(room.to_string()),
-                                suggestion: Some(
-                                    "Use a valid room name without special characters".to_string(),
-                                ),
-                            });
-                        }
+                    if let Some(room) = args.get("room").and_then(|r| r.as_str())
+                        && !self.is_valid_room_name(room)
+                    {
+                        return Some(ValidationError {
+                            field: "arguments.room".to_string(),
+                            message: format!("Invalid room name: {room}"),
+                            code: ValidationErrorCode::InvalidFormat,
+                            expected: Some("Valid Loxone room name".to_string()),
+                            actual: Some(room.to_string()),
+                            suggestion: Some(
+                                "Use a valid room name without special characters".to_string(),
+                            ),
+                        });
                     }
 
                     // Validate device UUID if present
-                    if let Some(uuid) = args.get("uuid").and_then(|u| u.as_str()) {
-                        if !self.is_valid_loxone_uuid(uuid) {
-                            return Some(ValidationError {
-                                field: "arguments.uuid".to_string(),
-                                message: format!("Invalid Loxone UUID format: {uuid}"),
-                                code: ValidationErrorCode::InvalidFormat,
-                                expected: Some(
-                                    "Loxone UUID format (XXXXXXXX-XXXXXX-XXX)".to_string(),
-                                ),
-                                actual: Some(uuid.to_string()),
-                                suggestion: Some("Use proper Loxone UUID format".to_string()),
-                            });
-                        }
+                    if let Some(uuid) = args.get("uuid").and_then(|u| u.as_str())
+                        && !self.is_valid_loxone_uuid(uuid)
+                    {
+                        return Some(ValidationError {
+                            field: "arguments.uuid".to_string(),
+                            message: format!("Invalid Loxone UUID format: {uuid}"),
+                            code: ValidationErrorCode::InvalidFormat,
+                            expected: Some("Loxone UUID format (XXXXXXXX-XXXXXX-XXX)".to_string()),
+                            actual: Some(uuid.to_string()),
+                            suggestion: Some("Use proper Loxone UUID format".to_string()),
+                        });
                     }
                 }
             }
@@ -503,24 +499,21 @@ impl LoxoneSpecificRule {
             "get_blinds" | "control_blind" => {
                 if let Some(args) = params.get("arguments") {
                     // Validate position parameter for blind control
-                    if tool_name == "control_blind" {
-                        if let Some(position) = args.get("position") {
-                            if let Some(pos_num) = position.as_f64() {
-                                if !(0.0..=1.0).contains(&pos_num) {
-                                    return Some(ValidationError {
-                                        field: "arguments.position".to_string(),
-                                        message: format!("Blind position out of range: {pos_num}"),
-                                        code: ValidationErrorCode::OutOfRange,
-                                        expected: Some("Position between 0.0 and 1.0".to_string()),
-                                        actual: Some(pos_num.to_string()),
-                                        suggestion: Some(
-                                            "Use position value between 0.0 (up) and 1.0 (down)"
-                                                .to_string(),
-                                        ),
-                                    });
-                                }
-                            }
-                        }
+                    if tool_name == "control_blind"
+                        && let Some(position) = args.get("position")
+                        && let Some(pos_num) = position.as_f64()
+                        && !(0.0..=1.0).contains(&pos_num)
+                    {
+                        return Some(ValidationError {
+                            field: "arguments.position".to_string(),
+                            message: format!("Blind position out of range: {pos_num}"),
+                            code: ValidationErrorCode::OutOfRange,
+                            expected: Some("Position between 0.0 and 1.0".to_string()),
+                            actual: Some(pos_num.to_string()),
+                            suggestion: Some(
+                                "Use position value between 0.0 (up) and 1.0 (down)".to_string(),
+                            ),
+                        });
                     }
                 }
             }

@@ -226,68 +226,66 @@ impl UnifiedValueResolver {
         let sensor_type = self.sensor_registry.detect_sensor_type(device).await?;
 
         // Strategy 1: Use appropriate parser based on sensor type
-        if let Some(sensor_type) = &sensor_type {
-            if let Some(parser) = self.parsers.get_parser(sensor_type) {
-                if let Some(raw_state) = raw_state {
-                    if let Ok(parsed) = parser.parse(raw_state) {
-                        let validation_status = self.validate_value(&parsed, sensor_type);
-                        return Ok(ResolvedValue {
-                            uuid: device.uuid.clone(),
-                            device_name: device.name.clone(),
-                            raw_value: raw_state.clone(),
-                            numeric_value: parsed.numeric_value,
-                            formatted_value: parsed.formatted_value,
-                            unit: parsed.unit,
-                            sensor_type: Some(sensor_type.clone()),
-                            room: device.room.clone(),
-                            source: ValueSource::RealTimeApi,
-                            timestamp: Utc::now(),
-                            confidence: parser.confidence(raw_state),
-                            validation_status,
-                        });
-                    }
-                }
-            }
+        if let Some(sensor_type) = &sensor_type
+            && let Some(parser) = self.parsers.get_parser(sensor_type)
+            && let Some(raw_state) = raw_state
+            && let Ok(parsed) = parser.parse(raw_state)
+        {
+            let validation_status = self.validate_value(&parsed, sensor_type);
+            return Ok(ResolvedValue {
+                uuid: device.uuid.clone(),
+                device_name: device.name.clone(),
+                raw_value: raw_state.clone(),
+                numeric_value: parsed.numeric_value,
+                formatted_value: parsed.formatted_value,
+                unit: parsed.unit,
+                sensor_type: Some(sensor_type.clone()),
+                room: device.room.clone(),
+                source: ValueSource::RealTimeApi,
+                timestamp: Utc::now(),
+                confidence: parser.confidence(raw_state),
+                validation_status,
+            });
         }
 
         // Strategy 2: Generic value extraction (current dashboard logic)
-        if let Some(raw_state) = raw_state {
-            if let Ok(parsed) = self.generic_value_extraction(raw_state) {
-                return Ok(ResolvedValue {
-                    uuid: device.uuid.clone(),
-                    device_name: device.name.clone(),
-                    raw_value: raw_state.clone(),
-                    numeric_value: parsed.numeric_value,
-                    formatted_value: parsed.formatted_value,
-                    unit: parsed.unit,
-                    sensor_type,
-                    room: device.room.clone(),
-                    source: ValueSource::RealTimeApi,
-                    timestamp: Utc::now(),
-                    confidence: 0.5, // Lower confidence for generic parsing
-                    validation_status: ValidationStatus::Unknown,
-                });
-            }
+        if let Some(raw_state) = raw_state
+            && let Ok(parsed) = self.generic_value_extraction(raw_state)
+        {
+            return Ok(ResolvedValue {
+                uuid: device.uuid.clone(),
+                device_name: device.name.clone(),
+                raw_value: raw_state.clone(),
+                numeric_value: parsed.numeric_value,
+                formatted_value: parsed.formatted_value,
+                unit: parsed.unit,
+                sensor_type,
+                room: device.room.clone(),
+                source: ValueSource::RealTimeApi,
+                timestamp: Utc::now(),
+                confidence: 0.5, // Lower confidence for generic parsing
+                validation_status: ValidationStatus::Unknown,
+            });
         }
 
         // Strategy 3: Fallback to cached states
-        if let Some(cached_value) = device.states.get("active").or(device.states.get("value")) {
-            if let Some(numeric) = cached_value.as_f64() {
-                return Ok(ResolvedValue {
-                    uuid: device.uuid.clone(),
-                    device_name: device.name.clone(),
-                    raw_value: cached_value.clone(),
-                    numeric_value: Some(numeric),
-                    formatted_value: format!("{numeric:.1}"),
-                    unit: None,
-                    sensor_type,
-                    room: device.room.clone(),
-                    source: ValueSource::StructureCache,
-                    timestamp: Utc::now(),
-                    confidence: 0.3, // Low confidence for cached data
-                    validation_status: ValidationStatus::Stale { age_seconds: 3600 }, // Assume 1h old
-                });
-            }
+        if let Some(cached_value) = device.states.get("active").or(device.states.get("value"))
+            && let Some(numeric) = cached_value.as_f64()
+        {
+            return Ok(ResolvedValue {
+                uuid: device.uuid.clone(),
+                device_name: device.name.clone(),
+                raw_value: cached_value.clone(),
+                numeric_value: Some(numeric),
+                formatted_value: format!("{numeric:.1}"),
+                unit: None,
+                sensor_type,
+                room: device.room.clone(),
+                source: ValueSource::StructureCache,
+                timestamp: Utc::now(),
+                confidence: 0.3, // Low confidence for cached data
+                validation_status: ValidationStatus::Stale { age_seconds: 3600 }, // Assume 1h old
+            });
         }
 
         // Strategy 4: Default unknown value
@@ -350,10 +348,10 @@ impl UnifiedValueResolver {
         if let Some(state_obj) = raw_state.as_object() {
             // Look for common state fields
             for field_name in ["position", "value", "dimmer", "active", "switch", "level"] {
-                if let Some(value) = state_obj.get(field_name) {
-                    if let Some(result) = self.extract_from_state_field(field_name, value) {
-                        return Ok(result);
-                    }
+                if let Some(value) = state_obj.get(field_name)
+                    && let Some(result) = self.extract_from_state_field(field_name, value)
+                {
+                    return Ok(result);
                 }
             }
         }
@@ -369,15 +367,15 @@ impl UnifiedValueResolver {
         }
 
         // Strategy 3: Direct string parsing
-        if let Some(value_str) = raw_state.as_str() {
-            if let Some(numeric) = extract_numeric_value(value_str) {
-                return Ok(ParsedValue {
-                    numeric_value: Some(numeric),
-                    formatted_value: value_str.to_string(),
-                    unit: extract_unit(value_str),
-                    metadata: HashMap::new(),
-                });
-            }
+        if let Some(value_str) = raw_state.as_str()
+            && let Some(numeric) = extract_numeric_value(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: value_str.to_string(),
+                unit: extract_unit(value_str),
+                metadata: HashMap::new(),
+            });
         }
 
         Err(LoxoneError::parsing_error(

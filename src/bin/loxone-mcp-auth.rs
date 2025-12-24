@@ -5,13 +5,13 @@
 
 use clap::{Parser, Subcommand};
 use loxone_mcp_rust::{
+    Result,
     client::create_client,
     config::{
-        credential_registry::CredentialRegistry,
-        credentials::{create_best_credential_manager, LoxoneCredentials},
         AuthMethod, CredentialStore, LoxoneConfig,
+        credential_registry::CredentialRegistry,
+        credentials::{LoxoneCredentials, create_best_credential_manager},
     },
-    Result,
 };
 use std::time::Duration;
 use tracing::{error, info};
@@ -184,7 +184,9 @@ async fn main() -> Result<()> {
                             }
                         }
                         _ => {
-                            error!("❌ Infisical not configured. Set INFISICAL_PROJECT_ID, INFISICAL_CLIENT_ID, and INFISICAL_CLIENT_SECRET");
+                            error!(
+                                "❌ Infisical not configured. Set INFISICAL_PROJECT_ID, INFISICAL_CLIENT_ID, and INFISICAL_CLIENT_SECRET"
+                            );
                             return Ok(());
                         }
                     }
@@ -201,7 +203,8 @@ async fn main() -> Result<()> {
                     .await?;
 
             // Store host in registry
-            std::env::set_var("LOXONE_HOST", format!("{host}:{port}"));
+            // SAFETY: This is called during credential storage before spawning threads
+            unsafe { std::env::set_var("LOXONE_HOST", format!("{host}:{port}")) };
 
             // Store credentials
             let credentials = LoxoneCredentials {
@@ -284,7 +287,8 @@ async fn main() -> Result<()> {
             let manager = create_best_credential_manager().await?;
 
             // Set host for retrieval
-            std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port));
+            // SAFETY: This is called during CLI operation before spawning threads
+            unsafe { std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port)) };
 
             let credentials = manager.get_credentials().await?;
 
@@ -323,14 +327,15 @@ async fn main() -> Result<()> {
 
             // Load existing credentials
             let manager = create_best_credential_manager().await?;
-            std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port));
+            // SAFETY: This is called during CLI operation before spawning threads
+            unsafe { std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port)) };
             let mut credentials = manager.get_credentials().await?;
 
             // Update fields if provided
-            if let Some(new_name) = &name {
-                if let Some(cred) = registry.credentials.get_mut(&credential_id) {
-                    cred.name = new_name.clone();
-                }
+            if let Some(new_name) = &name
+                && let Some(cred) = registry.credentials.get_mut(&credential_id)
+            {
+                cred.name = new_name.clone();
             }
             if let Some(new_username) = username {
                 credentials.username = new_username;
@@ -403,7 +408,8 @@ async fn main() -> Result<()> {
 
             // Load credentials
             let manager = create_best_credential_manager().await?;
-            std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port));
+            // SAFETY: This is called during CLI operation before spawning threads
+            unsafe { std::env::set_var("LOXONE_HOST", format!("{}:{}", stored.host, stored.port)) };
             let credentials = manager.get_credentials().await?;
 
             // Test connection

@@ -323,34 +323,27 @@ async fn check_loxone_http(
                 .get(format!("http://{ip}/jdev/sys/getversion"))
                 .send()
                 .await
+                && version_response.status().is_success()
+                && let Ok(data) = version_response.json::<serde_json::Value>().await
+                && let Some(v) = data
+                    .get("LL")
+                    .and_then(|ll| ll.get("value"))
+                    .and_then(|v| v.as_str())
             {
-                if version_response.status().is_success() {
-                    if let Ok(data) = version_response.json::<serde_json::Value>().await {
-                        if let Some(v) = data
-                            .get("LL")
-                            .and_then(|ll| ll.get("value"))
-                            .and_then(|v| v.as_str())
-                        {
-                            version = v.to_string();
-                        }
-                    }
-                }
+                version = v.to_string();
             }
 
             // Try to get project name (might require auth)
-            if let Ok(cfg_response) = client.get(format!("http://{ip}/jdev/cfg/api")).send().await {
-                if cfg_response.status().is_success() {
-                    if let Ok(data) = cfg_response.json::<serde_json::Value>().await {
-                        if let Some(project_name) = data
-                            .get("LL")
-                            .and_then(|ll| ll.get("value"))
-                            .and_then(|v| v.get("name"))
-                            .and_then(|n| n.as_str())
-                        {
-                            name = project_name.to_string();
-                        }
-                    }
-                }
+            if let Ok(cfg_response) = client.get(format!("http://{ip}/jdev/cfg/api")).send().await
+                && cfg_response.status().is_success()
+                && let Ok(data) = cfg_response.json::<serde_json::Value>().await
+                && let Some(project_name) = data
+                    .get("LL")
+                    .and_then(|ll| ll.get("value"))
+                    .and_then(|v| v.get("name"))
+                    .and_then(|n| n.as_str())
+            {
+                name = project_name.to_string();
             }
 
             let display_name = if version != "Unknown" {
@@ -412,14 +405,12 @@ fn extract_network_prefix(ip: &str) -> String {
 /// Parse UDP discovery response
 fn parse_udp_response(data: &[u8]) -> Option<String> {
     // Try to parse as JSON first
-    if data.starts_with(b"{") {
-        if let Ok(text) = std::str::from_utf8(data) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
-                if let Some(name) = json.get("name").and_then(|n| n.as_str()) {
-                    return Some(name.to_string());
-                }
-            }
-        }
+    if data.starts_with(b"{")
+        && let Ok(text) = std::str::from_utf8(data)
+        && let Ok(json) = serde_json::from_str::<serde_json::Value>(text)
+        && let Some(name) = json.get("name").and_then(|n| n.as_str())
+    {
+        return Some(name.to_string());
     }
 
     // Default name if parsing fails

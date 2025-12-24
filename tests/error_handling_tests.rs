@@ -35,9 +35,11 @@ async fn test_recovery_suggestions() {
     let suggestions = error.generate_recovery_suggestions();
 
     assert!(!suggestions.is_empty());
-    assert!(suggestions
-        .iter()
-        .any(|s| s.description.contains("credentials")));
+    assert!(
+        suggestions
+            .iter()
+            .any(|s| s.description.contains("credentials"))
+    );
     assert!(suggestions.iter().any(|s| s.action_code.is_some()));
 }
 

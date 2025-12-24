@@ -263,35 +263,35 @@ impl StreamingStructureParser {
 
         if let Value::Object(obj) = value {
             // Parse lastModified
-            if let Some(last_modified) = obj.get("lastModified") {
-                if let Some(s) = last_modified.as_str() {
-                    self.parsed_structure.last_modified = Some(s.to_string());
-                }
+            if let Some(last_modified) = obj.get("lastModified")
+                && let Some(s) = last_modified.as_str()
+            {
+                self.parsed_structure.last_modified = Some(s.to_string());
             }
 
             // Parse each section
-            if self.should_parse_section(&StructureSection::Controls) {
-                if let Some(Value::Object(controls_obj)) = obj.get("controls") {
-                    items_parsed += self.parse_controls_section(controls_obj.clone()).await?;
-                }
+            if self.should_parse_section(&StructureSection::Controls)
+                && let Some(Value::Object(controls_obj)) = obj.get("controls")
+            {
+                items_parsed += self.parse_controls_section(controls_obj.clone()).await?;
             }
 
-            if self.should_parse_section(&StructureSection::Rooms) {
-                if let Some(Value::Object(rooms_obj)) = obj.get("rooms") {
-                    items_parsed += self.parse_rooms_section(rooms_obj.clone()).await?;
-                }
+            if self.should_parse_section(&StructureSection::Rooms)
+                && let Some(Value::Object(rooms_obj)) = obj.get("rooms")
+            {
+                items_parsed += self.parse_rooms_section(rooms_obj.clone()).await?;
             }
 
-            if self.should_parse_section(&StructureSection::Categories) {
-                if let Some(Value::Object(cats_obj)) = obj.get("cats") {
-                    items_parsed += self.parse_categories_section(cats_obj.clone()).await?;
-                }
+            if self.should_parse_section(&StructureSection::Categories)
+                && let Some(Value::Object(cats_obj)) = obj.get("cats")
+            {
+                items_parsed += self.parse_categories_section(cats_obj.clone()).await?;
             }
 
-            if self.should_parse_section(&StructureSection::GlobalStates) {
-                if let Some(Value::Object(gs_obj)) = obj.get("globalStates") {
-                    items_parsed += self.parse_global_states_section(gs_obj.clone()).await?;
-                }
+            if self.should_parse_section(&StructureSection::GlobalStates)
+                && let Some(Value::Object(gs_obj)) = obj.get("globalStates")
+            {
+                items_parsed += self.parse_global_states_section(gs_obj.clone()).await?;
             }
         }
 

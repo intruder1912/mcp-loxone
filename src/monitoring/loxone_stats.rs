@@ -414,12 +414,12 @@ impl LoxoneStatsCollector {
                 if self.is_on_state(&current_state) && !self.is_on_state(&tracker.last_state) {
                     tracker.power_cycles += 1;
                     tracker.on_since = Some(Instant::now());
-                } else if !self.is_on_state(&current_state) && self.is_on_state(&tracker.last_state)
+                } else if !self.is_on_state(&current_state)
+                    && self.is_on_state(&tracker.last_state)
+                    && let Some(on_since) = tracker.on_since
                 {
-                    if let Some(on_since) = tracker.on_since {
-                        tracker.total_on_time += Instant::now().duration_since(on_since);
-                        tracker.on_since = None;
-                    }
+                    tracker.total_on_time += Instant::now().duration_since(on_since);
+                    tracker.on_since = None;
                 }
 
                 tracker.last_state = current_state.clone();

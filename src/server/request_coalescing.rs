@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{RwLock, oneshot};
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
@@ -211,12 +211,11 @@ impl RequestCoalescer {
         self.add_to_batch(pending_request).await;
 
         // Wait for response with timeout
-        let response = timeout(Duration::from_secs(5), rx)
+
+        timeout(Duration::from_secs(5), rx)
             .await
             .map_err(|_| LoxoneError::timeout("Request coalescing timeout"))?
-            .map_err(|_| LoxoneError::config("Response channel closed"))?;
-
-        response
+            .map_err(|_| LoxoneError::config("Response channel closed"))?
     }
 
     /// Add a request to the appropriate batch

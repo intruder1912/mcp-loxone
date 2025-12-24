@@ -9,14 +9,14 @@
 use crate::error::{LoxoneError, Result};
 use chrono::{DateTime, Utc};
 use futures::stream;
+use influxdb2::Client;
 use influxdb2::api::write::TimestampPrecision;
 use influxdb2::models::DataPoint;
-use influxdb2::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 use tracing::{debug, error, info, warn};
 
 /// InfluxDB configuration

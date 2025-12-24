@@ -160,22 +160,22 @@ impl MetricsCollector {
     /// Increment counter
     pub async fn increment_counter(&self, name: &str, value: u64) {
         let mut metrics = self.metrics.write().await;
-        if let Some(metric) = metrics.get_mut(name) {
-            if let MetricValue::Counter(ref mut count) = metric.value {
-                *count += value;
-                metric.timestamp = Instant::now();
-            }
+        if let Some(metric) = metrics.get_mut(name)
+            && let MetricValue::Counter(ref mut count) = metric.value
+        {
+            *count += value;
+            metric.timestamp = Instant::now();
         }
     }
 
     /// Set gauge value
     pub async fn set_gauge(&self, name: &str, value: f64) {
         let mut metrics = self.metrics.write().await;
-        if let Some(metric) = metrics.get_mut(name) {
-            if let MetricValue::Gauge(ref mut gauge_value) = metric.value {
-                *gauge_value = value;
-                metric.timestamp = Instant::now();
-            }
+        if let Some(metric) = metrics.get_mut(name)
+            && let MetricValue::Gauge(ref mut gauge_value) = metric.value
+        {
+            *gauge_value = value;
+            metric.timestamp = Instant::now();
         }
     }
 
@@ -239,15 +239,15 @@ impl MetricsCollector {
             metrics.insert(name.to_string(), metric);
         }
 
-        if let Some(metric) = metrics.get_mut(name) {
-            if let MetricValue::Histogram(ref mut values) = metric.value {
-                values.push(value);
-                metric.timestamp = Instant::now();
+        if let Some(metric) = metrics.get_mut(name)
+            && let MetricValue::Histogram(ref mut values) = metric.value
+        {
+            values.push(value);
+            metric.timestamp = Instant::now();
 
-                // Keep only last 1000 values to prevent memory growth
-                if values.len() > 1000 {
-                    values.drain(0..values.len() - 1000);
-                }
+            // Keep only last 1000 values to prevent memory growth
+            if values.len() > 1000 {
+                values.drain(0..values.len() - 1000);
             }
         }
     }

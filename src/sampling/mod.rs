@@ -446,11 +446,13 @@ mod tests {
             .unwrap();
         assert!(request.system_prompt.is_some());
         assert_eq!(request.messages.len(), 1);
-        assert!(request.messages[0]
-            .content
-            .text
-            .as_ref()
-            .unwrap()
-            .contains("cozy"));
+        assert!(
+            request.messages[0]
+                .content
+                .text
+                .as_ref()
+                .unwrap()
+                .contains("cozy")
+        );
     }
 }

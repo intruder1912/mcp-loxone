@@ -301,22 +301,21 @@ impl RateLimitConfig {
         }
 
         // Check consistency between time windows
-        if let Some(per_hour) = limits.requests_per_hour {
-            if per_hour < limits.requests_per_minute {
-                return Err(LoxoneError::invalid_input(format!(
-                    "Hourly limit cannot be less than per-minute limit for {context}"
-                )));
-            }
+        if let Some(per_hour) = limits.requests_per_hour
+            && per_hour < limits.requests_per_minute
+        {
+            return Err(LoxoneError::invalid_input(format!(
+                "Hourly limit cannot be less than per-minute limit for {context}"
+            )));
         }
 
-        if let Some(per_day) = limits.requests_per_day {
-            if let Some(per_hour) = limits.requests_per_hour {
-                if per_day < per_hour {
-                    return Err(LoxoneError::invalid_input(format!(
-                        "Daily limit cannot be less than hourly limit for {context}"
-                    )));
-                }
-            }
+        if let Some(per_day) = limits.requests_per_day
+            && let Some(per_hour) = limits.requests_per_hour
+            && per_day < per_hour
+        {
+            return Err(LoxoneError::invalid_input(format!(
+                "Daily limit cannot be less than hourly limit for {context}"
+            )));
         }
 
         Ok(())
@@ -504,25 +503,25 @@ impl RateLimitBucket {
         }
 
         // Check hour limit
-        if let Some(hour_limit) = limits.requests_per_hour {
-            if self.window_counters.hour.count(now) >= hour_limit as usize {
-                self.record_violation(now, penalty_config);
-                return RateLimitResult::Limited {
-                    retry_after: Duration::from_secs(3600),
-                    limit_type: "hour".to_string(),
-                };
-            }
+        if let Some(hour_limit) = limits.requests_per_hour
+            && self.window_counters.hour.count(now) >= hour_limit as usize
+        {
+            self.record_violation(now, penalty_config);
+            return RateLimitResult::Limited {
+                retry_after: Duration::from_secs(3600),
+                limit_type: "hour".to_string(),
+            };
         }
 
         // Check day limit
-        if let Some(day_limit) = limits.requests_per_day {
-            if self.window_counters.day.count(now) >= day_limit as usize {
-                self.record_violation(now, penalty_config);
-                return RateLimitResult::Limited {
-                    retry_after: Duration::from_secs(86400),
-                    limit_type: "day".to_string(),
-                };
-            }
+        if let Some(day_limit) = limits.requests_per_day
+            && self.window_counters.day.count(now) >= day_limit as usize
+        {
+            self.record_violation(now, penalty_config);
+            return RateLimitResult::Limited {
+                retry_after: Duration::from_secs(86400),
+                limit_type: "day".to_string(),
+            };
         }
 
         // Request allowed
@@ -541,10 +540,10 @@ impl RateLimitBucket {
         }
 
         // Check if we should reset violation count
-        if let Some(last_violation) = self.last_violation {
-            if now.duration_since(last_violation) > penalty_config.cooldown_period {
-                self.violations = 0;
-            }
+        if let Some(last_violation) = self.last_violation
+            && now.duration_since(last_violation) > penalty_config.cooldown_period
+        {
+            self.violations = 0;
         }
 
         self.violations += 1;

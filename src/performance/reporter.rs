@@ -892,39 +892,39 @@ impl PerformanceReporter {
         let mut alerts = Vec::new();
 
         // Check response time alert
-        if let Some(duration) = measurement.timing.get_duration() {
-            if duration.as_millis() as u64 > self.config.alerting.thresholds.response_time_ms {
-                alerts.push(PerformanceAlert {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    alert_type: AlertType::ResponseTime,
-                    severity: AlertSeverity::Warning,
-                    message: format!("High response time: {}ms", duration.as_millis()),
-                    metric_value: duration.as_millis() as f64,
-                    threshold: self.config.alerting.thresholds.response_time_ms as f64,
-                    triggered_at: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs(),
-                });
-            }
+        if let Some(duration) = measurement.timing.get_duration()
+            && duration.as_millis() as u64 > self.config.alerting.thresholds.response_time_ms
+        {
+            alerts.push(PerformanceAlert {
+                id: uuid::Uuid::new_v4().to_string(),
+                alert_type: AlertType::ResponseTime,
+                severity: AlertSeverity::Warning,
+                message: format!("High response time: {}ms", duration.as_millis()),
+                metric_value: duration.as_millis() as f64,
+                threshold: self.config.alerting.thresholds.response_time_ms as f64,
+                triggered_at: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            });
         }
 
         // Check CPU usage alert
-        if let Some(cpu) = measurement.resource_usage.cpu_usage {
-            if cpu > self.config.alerting.thresholds.cpu_usage_percent {
-                alerts.push(PerformanceAlert {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    alert_type: AlertType::CpuUsage,
-                    severity: AlertSeverity::Critical,
-                    message: format!("High CPU usage: {cpu:.1}%"),
-                    metric_value: cpu,
-                    threshold: self.config.alerting.thresholds.cpu_usage_percent,
-                    triggered_at: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs(),
-                });
-            }
+        if let Some(cpu) = measurement.resource_usage.cpu_usage
+            && cpu > self.config.alerting.thresholds.cpu_usage_percent
+        {
+            alerts.push(PerformanceAlert {
+                id: uuid::Uuid::new_v4().to_string(),
+                alert_type: AlertType::CpuUsage,
+                severity: AlertSeverity::Critical,
+                message: format!("High CPU usage: {cpu:.1}%"),
+                metric_value: cpu,
+                threshold: self.config.alerting.thresholds.cpu_usage_percent,
+                triggered_at: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            });
         }
 
         // Send alerts

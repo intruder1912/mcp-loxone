@@ -41,7 +41,7 @@ pub use websocket_resilience::{
     WebSocketResilienceConfig, WebSocketResilienceManager,
 };
 
-use crate::config::{credentials::LoxoneCredentials, LoxoneConfig};
+use crate::config::{LoxoneConfig, credentials::LoxoneCredentials};
 use crate::error::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -299,10 +299,10 @@ impl ClientContext {
                 self.update_capabilities(&mut capabilities, &device_type, &category);
 
                 // Update room device count
-                if let Some(room_uuid) = &room_uuid {
-                    if let Some(room) = rooms.get_mut(room_uuid) {
-                        room.device_count += 1;
-                    }
+                if let Some(room_uuid) = &room_uuid
+                    && let Some(room) = rooms.get_mut(room_uuid)
+                {
+                    room.device_count += 1;
                 }
 
                 devices.insert(
@@ -509,7 +509,9 @@ pub async fn create_client(
             }
             #[cfg(not(feature = "crypto-openssl"))]
             {
-                tracing::warn!("Token authentication requested but crypto feature is disabled, falling back to basic auth");
+                tracing::warn!(
+                    "Token authentication requested but crypto feature is disabled, falling back to basic auth"
+                );
                 let client =
                     http_client::LoxoneHttpClient::new(config.clone(), credentials.clone()).await?;
                 Ok(Box::new(client))
@@ -562,7 +564,9 @@ pub async fn create_hybrid_client(
             }
             #[cfg(not(feature = "crypto-openssl"))]
             {
-                tracing::warn!("Token authentication requested but crypto feature is disabled, falling back to basic auth");
+                tracing::warn!(
+                    "Token authentication requested but crypto feature is disabled, falling back to basic auth"
+                );
                 Arc::new(
                     http_client::LoxoneHttpClient::new(config.clone(), credentials.clone()).await?,
                 )

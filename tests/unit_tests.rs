@@ -24,9 +24,11 @@ mod tests {
     fn test_loxone_error_types() {
         // Test different error types
         let connection_error = LoxoneError::connection("Test connection error");
-        assert!(connection_error
-            .to_string()
-            .contains("Test connection error"));
+        assert!(
+            connection_error
+                .to_string()
+                .contains("Test connection error")
+        );
 
         let auth_error = LoxoneError::authentication("Test auth error");
         assert!(auth_error.to_string().contains("Test auth error"));

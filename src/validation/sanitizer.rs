@@ -3,7 +3,7 @@
 #[cfg(test)]
 use super::ValidationConfig;
 use super::{
-    utils, ValidationContext, ValidationResult, ValidationWarning, ValidationWarningCode, Validator,
+    ValidationContext, ValidationResult, ValidationWarning, ValidationWarningCode, Validator, utils,
 };
 use crate::error::Result;
 use serde_json::{Map, Value};

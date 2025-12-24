@@ -177,14 +177,14 @@ impl WeatherStorage {
             if self.is_weather_device(device) {
                 // Try various heuristics to match UUID index to device
                 // This is implementation-specific to Loxone's UUID index system
-                if let Some(device_index) = self.extract_device_index_from_uuid(uuid) {
-                    if device_index == uuid_index {
-                        debug!(
-                            "Resolved UUID {} from structure for index {}",
-                            uuid, uuid_index
-                        );
-                        return Some(uuid.clone());
-                    }
+                if let Some(device_index) = self.extract_device_index_from_uuid(uuid)
+                    && device_index == uuid_index
+                {
+                    debug!(
+                        "Resolved UUID {} from structure for index {}",
+                        uuid, uuid_index
+                    );
+                    return Some(uuid.clone());
                 }
             }
         }
@@ -196,10 +196,10 @@ impl WeatherStorage {
     fn extract_device_index_from_uuid(&self, uuid: &str) -> Option<u32> {
         // Loxone UUIDs often follow patterns like "0F1A2B3C-0001-4567-8901-234567890123"
         // The index might be embedded in specific parts of the UUID
-        if let Some(parts) = uuid.split('-').nth(1) {
-            if let Ok(index) = u32::from_str_radix(parts, 16) {
-                return Some(index);
-            }
+        if let Some(parts) = uuid.split('-').nth(1)
+            && let Ok(index) = u32::from_str_radix(parts, 16)
+        {
+            return Some(index);
         }
 
         // Alternative: hash-based mapping (fallback)

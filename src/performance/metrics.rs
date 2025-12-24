@@ -451,12 +451,11 @@ impl MetricsCollector {
         // In production, this would use proper system metrics
         use std::fs;
 
-        if let Ok(loadavg) = fs::read_to_string("/proc/loadavg") {
-            if let Some(load) = loadavg.split_whitespace().next() {
-                if let Ok(load_value) = load.parse::<f64>() {
-                    return Ok((load_value * 100.0).min(100.0)); // Convert to percentage
-                }
-            }
+        if let Ok(loadavg) = fs::read_to_string("/proc/loadavg")
+            && let Some(load) = loadavg.split_whitespace().next()
+            && let Ok(load_value) = load.parse::<f64>()
+        {
+            return Ok((load_value * 100.0).min(100.0)); // Convert to percentage
         }
 
         // Fallback: simulate some CPU usage
@@ -477,10 +476,10 @@ impl MetricsCollector {
                     if let Some(value) = line.split_whitespace().nth(1) {
                         total_kb = value.parse().unwrap_or(0);
                     }
-                } else if line.starts_with("MemAvailable:") {
-                    if let Some(value) = line.split_whitespace().nth(1) {
-                        available_kb = value.parse().unwrap_or(0);
-                    }
+                } else if line.starts_with("MemAvailable:")
+                    && let Some(value) = line.split_whitespace().nth(1)
+                {
+                    available_kb = value.parse().unwrap_or(0);
                 }
             }
 

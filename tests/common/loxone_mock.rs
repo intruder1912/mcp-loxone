@@ -3,10 +3,10 @@
 //! Provides mock HTTP servers that simulate Loxone Miniserver API responses
 //! for testing without requiring actual hardware.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use wiremock::{
-    matchers::{method, path, path_regex},
     Mock, MockServer, ResponseTemplate,
+    matchers::{method, path, path_regex},
 };
 
 /// Mock Loxone Miniserver for testing

@@ -7,12 +7,12 @@
 
 use clap::{Parser, ValueEnum};
 use loxone_mcp_rust::{
-    config::{
-        credential_registry::CredentialRegistry,
-        credentials::{create_best_credential_manager, CredentialManager, LoxoneCredentials},
-        CredentialStore,
-    },
     Result,
+    config::{
+        CredentialStore,
+        credential_registry::CredentialRegistry,
+        credentials::{CredentialManager, LoxoneCredentials, create_best_credential_manager},
+    },
 };
 use std::{
     io::{self, Write},
@@ -408,7 +408,9 @@ async fn main() -> Result<()> {
             println!("export LOXONE_API_KEY=\"{api_key}\"");
         }
         println!("```");
-        println!("\n💡 To make these permanent, add them to your shell profile (~/.bashrc, ~/.zshrc, etc.)");
+        println!(
+            "\n💡 To make these permanent, add them to your shell profile (~/.bashrc, ~/.zshrc, etc.)"
+        );
         println!("\nAlternatively, save them to a file and source it:");
         println!("```bash");
         println!("# Save to file");
@@ -470,7 +472,9 @@ async fn main() -> Result<()> {
                         Ok(validated_name) => break validated_name,
                         Err(e) => {
                             println!("❌ Invalid name: {e}");
-                            println!("   Names must be 1-50 characters, contain only letters, numbers, spaces, and common punctuation");
+                            println!(
+                                "   Names must be 1-50 characters, contain only letters, numbers, spaces, and common punctuation"
+                            );
                             continue;
                         }
                     }
@@ -498,10 +502,13 @@ async fn main() -> Result<()> {
             println!("   Name: {credential_name}");
             println!("\n🚀 Quick Start with Credential ID:");
             println!("   cargo run --bin loxone-mcp-server stdio --credential-id {credential_id}");
-            println!("   cargo run --bin loxone-mcp-server http --port 3001 --credential-id {credential_id}");
+            println!(
+                "   cargo run --bin loxone-mcp-server http --port 3001 --credential-id {credential_id}"
+            );
 
             // Store host information with the credential manager
-            std::env::set_var("LOXONE_HOST", &host);
+            // SAFETY: This is called during setup before spawning threads that read env vars
+            unsafe { std::env::set_var("LOXONE_HOST", &host) };
             info!("✅ Host information set for credential storage");
         }
     }
@@ -528,7 +535,9 @@ async fn main() -> Result<()> {
         && !matches!(selected_backend, CredentialBackend::Environment);
 
     if will_have_credential_id {
-        println!("1. Test with credential ID: cargo run --bin loxone-mcp-server stdio --credential-id <id>");
+        println!(
+            "1. Test with credential ID: cargo run --bin loxone-mcp-server stdio --credential-id <id>"
+        );
         println!("2. List credential IDs: cargo run --bin loxone-mcp-auth list");
         println!("3. Test credentials: cargo run --bin loxone-mcp-auth test <credential-id>");
     } else {
@@ -744,7 +753,9 @@ fn select_credential_backend_interactive() -> Result<CredentialBackend> {
         println!("       Quick Setup: export INFISICAL_PROJECT_ID=\"proj_abc123\"");
         println!("                    export INFISICAL_CLIENT_ID=\"st.client123\"");
         println!("                    export INFISICAL_CLIENT_SECRET=\"st.secret456\"");
-        println!("                    # Für lokale Instanz: export INFISICAL_HOST=\"http://localhost:8080\"");
+        println!(
+            "                    # Für lokale Instanz: export INFISICAL_HOST=\"http://localhost:8080\""
+        );
     }
 
     println!("  3. Keychain ❌ - System Keychain (disabled - unmaintained dependencies)");
@@ -768,7 +779,9 @@ fn select_credential_backend_interactive() -> Result<CredentialBackend> {
                     println!("   3. Go to Settings → Service Tokens → Create Token");
                     println!("   4. Set the environment variables:");
                     println!();
-                    println!("   export INFISICAL_PROJECT_ID=\"proj_abc123...\"    # From the project URL");
+                    println!(
+                        "   export INFISICAL_PROJECT_ID=\"proj_abc123...\"    # From the project URL"
+                    );
                     println!(
                         "   export INFISICAL_CLIENT_ID=\"st.client123...\"   # Machine Identity ID"
                     );
@@ -778,7 +791,9 @@ fn select_credential_backend_interactive() -> Result<CredentialBackend> {
                     println!("   export INFISICAL_ENVIRONMENT=\"dev\"             # Optional");
                     println!();
                     println!("   🏠 For local/self-hosted instance additionally:");
-                    println!("   export INFISICAL_HOST=\"http://localhost:8080\"  # Local Docker instance");
+                    println!(
+                        "   export INFISICAL_HOST=\"http://localhost:8080\"  # Local Docker instance"
+                    );
                     println!(
                         "   # or: export INFISICAL_HOST=\"https://your-infisical.domain.com\""
                     );
@@ -1088,7 +1103,9 @@ fn show_backend_configuration_advice(backend: &CredentialBackend) {
 
     match backend {
         CredentialBackend::Auto => {
-            println!("\n✨ Auto-Modus gewählt - der Server wird automatisch das beste verfügbare Backend verwenden:");
+            println!(
+                "\n✨ Auto-Modus gewählt - der Server wird automatisch das beste verfügbare Backend verwenden:"
+            );
             println!("   1. Infisical (wenn konfiguriert)");
             println!("   2. Umgebungsvariablen");
             println!("   3. System Keychain (disabled)");
@@ -1118,7 +1135,9 @@ fn show_backend_configuration_advice(backend: &CredentialBackend) {
                     "   Project Dashboard: https://app.infisical.com/project/{project_id}/overview"
                 );
                 println!("   Settings: https://app.infisical.com/project/{project_id}/settings");
-                println!("   Service Tokens: https://app.infisical.com/project/{project_id}/settings/service-tokens");
+                println!(
+                    "   Service Tokens: https://app.infisical.com/project/{project_id}/settings/service-tokens"
+                );
             }
         }
         CredentialBackend::Environment => {

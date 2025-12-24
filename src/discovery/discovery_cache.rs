@@ -355,10 +355,10 @@ impl DiscoveryCache {
     /// Start the discovery cache background tasks
     pub async fn start(&self) -> Result<()> {
         // Load from persistent storage if enabled
-        if self.config.enable_persistence {
-            if let Err(e) = self.load_from_disk().await {
-                warn!("Failed to load cache from disk: {}", e);
-            }
+        if self.config.enable_persistence
+            && let Err(e) = self.load_from_disk().await
+        {
+            warn!("Failed to load cache from disk: {}", e);
         }
 
         // Start cleanup task
@@ -374,10 +374,10 @@ impl DiscoveryCache {
     /// Stop the discovery cache
     pub async fn stop(&self) -> Result<()> {
         // Save to persistent storage if enabled
-        if self.config.enable_persistence {
-            if let Err(e) = self.save_to_disk().await {
-                warn!("Failed to save cache to disk: {}", e);
-            }
+        if self.config.enable_persistence
+            && let Err(e) = self.save_to_disk().await
+        {
+            warn!("Failed to save cache to disk: {}", e);
         }
 
         // Send shutdown signal
@@ -656,21 +656,21 @@ impl DiscoveryCache {
 
     /// Load cache from persistent storage
     async fn load_from_disk(&self) -> Result<()> {
-        if let Some(cache_file) = &self.config.cache_file_path {
-            if cache_file.exists() {
-                match tokio::fs::read_to_string(cache_file).await {
-                    Ok(contents) => {
-                        match serde_json::from_str::<HashMap<String, CacheEntry>>(&contents) {
-                            Ok(loaded_cache) => {
-                                let mut cache = self.cache.write().await;
-                                *cache = loaded_cache;
-                                info!("Loaded {} entries from cache file", cache.len());
-                            }
-                            Err(e) => return Err(LoxoneError::Json(e)),
+        if let Some(cache_file) = &self.config.cache_file_path
+            && cache_file.exists()
+        {
+            match tokio::fs::read_to_string(cache_file).await {
+                Ok(contents) => {
+                    match serde_json::from_str::<HashMap<String, CacheEntry>>(&contents) {
+                        Ok(loaded_cache) => {
+                            let mut cache = self.cache.write().await;
+                            *cache = loaded_cache;
+                            info!("Loaded {} entries from cache file", cache.len());
                         }
+                        Err(e) => return Err(LoxoneError::Json(e)),
                     }
-                    Err(e) => return Err(LoxoneError::Io(e)),
                 }
+                Err(e) => return Err(LoxoneError::Io(e)),
             }
         }
 

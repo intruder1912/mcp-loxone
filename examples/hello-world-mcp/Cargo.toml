@@ -1,22 +1,16 @@
 [package]
 name = "hello-world-mcp"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Ralf Anton Beier"]
 description = "Minimal MCP server example using the framework"
 
 [dependencies]
-pulseengine-mcp-protocol = "0.13.0"
-pulseengine-mcp-server = "0.13.0"
-pulseengine-mcp-auth = "0.13.0"
-pulseengine-mcp-transport = "0.13.0"
+pulseengine-mcp-macros = "0.17.0"
+pulseengine-mcp-server = "0.17.0"
 
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-async-trait = { workspace = true }
-uuid = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-anyhow = { workspace = true }

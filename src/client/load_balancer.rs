@@ -6,8 +6,8 @@
 use crate::client::adaptive_pool::AdaptiveConnection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime};
 use tracing::debug;
 

@@ -308,13 +308,13 @@ impl CorsConfig {
         }
 
         // Validate max age
-        if let Some(max_age) = self.max_age {
-            if max_age.as_secs() > 86400 * 7 {
-                // 7 days
-                return Err(LoxoneError::invalid_input(
-                    "Max age should not exceed 7 days",
-                ));
-            }
+        if let Some(max_age) = self.max_age
+            && max_age.as_secs() > 86400 * 7
+        {
+            // 7 days
+            return Err(LoxoneError::invalid_input(
+                "Max age should not exceed 7 days",
+            ));
         }
 
         Ok(())
@@ -396,10 +396,10 @@ impl CorsMiddleware {
         _headers: Option<&str>,
     ) -> CorsResult {
         // Check if origin is allowed
-        if let Some(origin) = origin {
-            if !self.config.is_origin_allowed(origin) {
-                return CorsResult::Forbidden;
-            }
+        if let Some(origin) = origin
+            && !self.config.is_origin_allowed(origin)
+        {
+            return CorsResult::Forbidden;
         }
 
         // Handle preflight requests
@@ -472,9 +472,11 @@ mod tests {
         let headers = config.generate_headers(Some("https://example.com"), Some("GET"));
 
         assert!(!headers.is_empty());
-        assert!(headers
-            .iter()
-            .any(|(name, _)| name == "Access-Control-Allow-Origin"));
+        assert!(
+            headers
+                .iter()
+                .any(|(name, _)| name == "Access-Control-Allow-Origin")
+        );
     }
 
     #[test]

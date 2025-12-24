@@ -433,22 +433,22 @@ impl EnhancedValidator {
         let start_time = SystemTime::now();
 
         // Check if IP is blocked
-        if let Some(client_ip) = &context.client_ip {
-            if self.is_ip_blocked(client_ip).await {
-                return EnhancedValidationResult {
-                    sanitization_result: SanitizationResult {
-                        is_safe: false,
-                        sanitized_data: None,
-                        issues: vec![],
-                        warnings: vec![],
-                    },
-                    security_validations: vec![],
-                    anomaly_results: None,
-                    risk_score: 100.0,
-                    recommendations: vec![],
-                    blocked_reason: Some("IP address is blocked".to_string()),
-                };
-            }
+        if let Some(client_ip) = &context.client_ip
+            && self.is_ip_blocked(client_ip).await
+        {
+            return EnhancedValidationResult {
+                sanitization_result: SanitizationResult {
+                    is_safe: false,
+                    sanitized_data: None,
+                    issues: vec![],
+                    warnings: vec![],
+                },
+                security_validations: vec![],
+                anomaly_results: None,
+                risk_score: 100.0,
+                recommendations: vec![],
+                blocked_reason: Some("IP address is blocked".to_string()),
+            };
         }
 
         // Base sanitization
@@ -458,17 +458,17 @@ impl EnhancedValidator {
         let mut security_validations = Vec::new();
 
         // Checksum validation
-        if self.config.crypto_validation.checksum_validation {
-            if let Some(checksum) = &context.checksum {
-                security_validations.push(self.validate_checksum(data, checksum).await);
-            }
+        if self.config.crypto_validation.checksum_validation
+            && let Some(checksum) = &context.checksum
+        {
+            security_validations.push(self.validate_checksum(data, checksum).await);
         }
 
         // Nonce validation
-        if self.config.crypto_validation.nonce_validation {
-            if let Some(nonce) = &context.nonce {
-                security_validations.push(self.validate_nonce(nonce).await);
-            }
+        if self.config.crypto_validation.nonce_validation
+            && let Some(nonce) = &context.nonce
+        {
+            security_validations.push(self.validate_nonce(nonce).await);
         }
 
         // Rate limiting
@@ -685,45 +685,45 @@ impl EnhancedValidator {
         let data_str = serde_json::to_string(data).unwrap_or_default();
 
         // Check command injection
-        if self.config.hardening_policies.command_injection_prevention {
-            if let Some(regex) = self.pattern_matchers.get("command_injection") {
-                let passed = !regex.is_match(&data_str);
-                validations.push(SecurityValidation {
-                    validation_type: ValidationType::Pattern,
-                    passed,
-                    details: if passed {
-                        "No command injection patterns detected".to_string()
-                    } else {
-                        "Command injection pattern detected".to_string()
-                    },
-                    severity: if passed {
-                        ValidationSeverity::Info
-                    } else {
-                        ValidationSeverity::Critical
-                    },
-                });
-            }
+        if self.config.hardening_policies.command_injection_prevention
+            && let Some(regex) = self.pattern_matchers.get("command_injection")
+        {
+            let passed = !regex.is_match(&data_str);
+            validations.push(SecurityValidation {
+                validation_type: ValidationType::Pattern,
+                passed,
+                details: if passed {
+                    "No command injection patterns detected".to_string()
+                } else {
+                    "Command injection pattern detected".to_string()
+                },
+                severity: if passed {
+                    ValidationSeverity::Info
+                } else {
+                    ValidationSeverity::Critical
+                },
+            });
         }
 
         // Check NoSQL injection
-        if self.config.hardening_policies.nosql_injection_prevention {
-            if let Some(regex) = self.pattern_matchers.get("nosql_injection") {
-                let passed = !regex.is_match(&data_str);
-                validations.push(SecurityValidation {
-                    validation_type: ValidationType::Pattern,
-                    passed,
-                    details: if passed {
-                        "No NoSQL injection patterns detected".to_string()
-                    } else {
-                        "NoSQL injection pattern detected".to_string()
-                    },
-                    severity: if passed {
-                        ValidationSeverity::Info
-                    } else {
-                        ValidationSeverity::Critical
-                    },
-                });
-            }
+        if self.config.hardening_policies.nosql_injection_prevention
+            && let Some(regex) = self.pattern_matchers.get("nosql_injection")
+        {
+            let passed = !regex.is_match(&data_str);
+            validations.push(SecurityValidation {
+                validation_type: ValidationType::Pattern,
+                passed,
+                details: if passed {
+                    "No NoSQL injection patterns detected".to_string()
+                } else {
+                    "NoSQL injection pattern detected".to_string()
+                },
+                severity: if passed {
+                    ValidationSeverity::Info
+                } else {
+                    ValidationSeverity::Critical
+                },
+            });
         }
 
         validations
@@ -1051,13 +1051,13 @@ impl EnhancedValidator {
             recommendations.push("Rate limit exceeded - consider implementing CAPTCHA".to_string());
         }
 
-        if let Some(anomaly) = anomaly_results {
-            if matches!(
+        if let Some(anomaly) = anomaly_results
+            && matches!(
                 anomaly.pattern_classification,
                 PatternClassification::Suspicious | PatternClassification::Malicious
-            ) {
-                recommendations.push("Unusual pattern detected - review security logs".to_string());
-            }
+            )
+        {
+            recommendations.push("Unusual pattern detected - review security logs".to_string());
         }
 
         recommendations
@@ -1087,13 +1087,13 @@ impl EnhancedValidator {
         }
 
         // Block on malicious patterns
-        if let Some(anomaly) = anomaly_results {
-            if matches!(
+        if let Some(anomaly) = anomaly_results
+            && matches!(
                 anomaly.pattern_classification,
                 PatternClassification::Malicious
-            ) {
-                return Some("Malicious pattern detected".to_string());
-            }
+            )
+        {
+            return Some("Malicious pattern detected".to_string());
         }
 
         // Block if not safe according to sanitization
@@ -1229,10 +1229,12 @@ mod tests {
 
         // Second request with same nonce should fail
         let result2 = validator.validate(&data, context1).await;
-        assert!(result2
-            .security_validations
-            .iter()
-            .any(|v| { matches!(v.validation_type, ValidationType::Nonce) && !v.passed }));
+        assert!(
+            result2
+                .security_validations
+                .iter()
+                .any(|v| { matches!(v.validation_type, ValidationType::Nonce) && !v.passed })
+        );
     }
 
     #[tokio::test]

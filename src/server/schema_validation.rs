@@ -5,7 +5,7 @@
 
 use crate::error::{LoxoneError, Result};
 use regex::Regex;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
@@ -230,48 +230,48 @@ impl SchemaConstraint {
                 })?;
 
                 // Length validation
-                if let Some(min_len) = self.min_length {
-                    if str_value.len() < min_len {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must be at least {} characters long",
-                            self.field, min_len
-                        )));
-                    }
+                if let Some(min_len) = self.min_length
+                    && str_value.len() < min_len
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must be at least {} characters long",
+                        self.field, min_len
+                    )));
                 }
 
-                if let Some(max_len) = self.max_length {
-                    if str_value.len() > max_len {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must be at most {} characters long",
-                            self.field, max_len
-                        )));
-                    }
+                if let Some(max_len) = self.max_length
+                    && str_value.len() > max_len
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must be at most {} characters long",
+                        self.field, max_len
+                    )));
                 }
 
                 // Pattern validation
-                if let Some(ref pattern) = self.pattern {
-                    if !pattern.is_match(str_value) {
-                        let description = self
-                            .pattern_description
-                            .as_deref()
-                            .unwrap_or("valid format");
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must match {}: '{}'",
-                            self.field, description, str_value
-                        )));
-                    }
+                if let Some(ref pattern) = self.pattern
+                    && !pattern.is_match(str_value)
+                {
+                    let description = self
+                        .pattern_description
+                        .as_deref()
+                        .unwrap_or("valid format");
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must match {}: '{}'",
+                        self.field, description, str_value
+                    )));
                 }
 
                 // Enum validation
-                if let Some(ref enum_values) = self.enum_values {
-                    if !enum_values.contains(&str_value.to_string()) {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must be one of: {}. Got: '{}'",
-                            self.field,
-                            enum_values.join(", "),
-                            str_value
-                        )));
-                    }
+                if let Some(ref enum_values) = self.enum_values
+                    && !enum_values.contains(&str_value.to_string())
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must be one of: {}. Got: '{}'",
+                        self.field,
+                        enum_values.join(", "),
+                        str_value
+                    )));
                 }
             }
 
@@ -288,22 +288,22 @@ impl SchemaConstraint {
                 })?;
 
                 // Range validation
-                if let Some(min_val) = self.min_value {
-                    if num_value < min_val {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must be at least {}, got: {}",
-                            self.field, min_val, num_value
-                        )));
-                    }
+                if let Some(min_val) = self.min_value
+                    && num_value < min_val
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must be at least {}, got: {}",
+                        self.field, min_val, num_value
+                    )));
                 }
 
-                if let Some(max_val) = self.max_value {
-                    if num_value > max_val {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' must be at most {}, got: {}",
-                            self.field, max_val, num_value
-                        )));
-                    }
+                if let Some(max_val) = self.max_value
+                    && num_value > max_val
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' must be at most {}, got: {}",
+                        self.field, max_val, num_value
+                    )));
                 }
             }
 
@@ -329,22 +329,22 @@ impl SchemaConstraint {
                 })?;
 
                 // Length validation for arrays
-                if let Some(min_len) = self.min_length {
-                    if array.len() < min_len {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' array must have at least {} items",
-                            self.field, min_len
-                        )));
-                    }
+                if let Some(min_len) = self.min_length
+                    && array.len() < min_len
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' array must have at least {} items",
+                        self.field, min_len
+                    )));
                 }
 
-                if let Some(max_len) = self.max_length {
-                    if array.len() > max_len {
-                        return Err(LoxoneError::invalid_input(format!(
-                            "Field '{}' array must have at most {} items",
-                            self.field, max_len
-                        )));
-                    }
+                if let Some(max_len) = self.max_length
+                    && array.len() > max_len
+                {
+                    return Err(LoxoneError::invalid_input(format!(
+                        "Field '{}' array must have at most {} items",
+                        self.field, max_len
+                    )));
                 }
             }
 
@@ -382,16 +382,16 @@ impl SchemaConstraint {
         }
 
         // Add string constraints
-        if let Some(min_len) = self.min_length {
-            if self.field_type == "string" || self.field_type == "array" {
-                schema["minLength"] = json!(min_len);
-            }
+        if let Some(min_len) = self.min_length
+            && (self.field_type == "string" || self.field_type == "array")
+        {
+            schema["minLength"] = json!(min_len);
         }
 
-        if let Some(max_len) = self.max_length {
-            if self.field_type == "string" || self.field_type == "array" {
-                schema["maxLength"] = json!(max_len);
-            }
+        if let Some(max_len) = self.max_length
+            && (self.field_type == "string" || self.field_type == "array")
+        {
+            schema["maxLength"] = json!(max_len);
         }
 
         // Add number constraints
@@ -633,13 +633,19 @@ impl SchemaValidator {
         // Security schemas
         self.add_tool_constraints(
             "get_security_status",
-            vec![SchemaConstraint::string_with_pattern(
-                "zone",
-                r"^[a-zA-Z0-9_-]+$",
-                "Security zone identifier",
-                false,
-            )?
-            .with_examples(vec![json!("main"), json!("perimeter"), json!("internal")])],
+            vec![
+                SchemaConstraint::string_with_pattern(
+                    "zone",
+                    r"^[a-zA-Z0-9_-]+$",
+                    "Security zone identifier",
+                    false,
+                )?
+                .with_examples(vec![
+                    json!("main"),
+                    json!("perimeter"),
+                    json!("internal"),
+                ]),
+            ],
         );
 
         // Additional MCP tool schemas
@@ -670,8 +676,10 @@ impl SchemaValidator {
 
         self.add_tool_constraints(
             "control_all_lights",
-            vec![SchemaConstraint::device_action("action", true)
-                .with_examples(vec![json!("on"), json!("off")])],
+            vec![
+                SchemaConstraint::device_action("action", true)
+                    .with_examples(vec![json!("on"), json!("off")]),
+            ],
         );
 
         self.add_tool_constraints(
@@ -771,18 +779,20 @@ impl SchemaValidator {
         // get_devices_by_type validation
         self.add_tool_constraints(
             "get_devices_by_type",
-            vec![SchemaConstraint::string_with_pattern(
-                "device_type",
-                r"^[a-zA-Z0-9_-]+$",
-                "Device type (e.g., Switch, Jalousie, Dimmer)",
-                false,
-            )?
-            .with_examples(vec![
-                json!("Switch"),
-                json!("Jalousie"),
-                json!("Dimmer"),
-                json!("LightController"),
-            ])],
+            vec![
+                SchemaConstraint::string_with_pattern(
+                    "device_type",
+                    r"^[a-zA-Z0-9_-]+$",
+                    "Device type (e.g., Switch, Jalousie, Dimmer)",
+                    false,
+                )?
+                .with_examples(vec![
+                    json!("Switch"),
+                    json!("Jalousie"),
+                    json!("Dimmer"),
+                    json!("LightController"),
+                ]),
+            ],
         );
 
         // get_available_capabilities validation
@@ -1003,14 +1013,14 @@ impl SchemaValidator {
         self.validate_tool_parameters(tool_name_str, parameters)?;
 
         // Then apply defaults
-        if let Some(constraints) = self.constraints.get(tool_name_str) {
-            if let Some(params_obj) = parameters.as_object_mut() {
-                for constraint in constraints {
-                    if !params_obj.contains_key(&constraint.field) {
-                        if let Some(ref default_value) = constraint.default {
-                            params_obj.insert(constraint.field.clone(), default_value.clone());
-                        }
-                    }
+        if let Some(constraints) = self.constraints.get(tool_name_str)
+            && let Some(params_obj) = parameters.as_object_mut()
+        {
+            for constraint in constraints {
+                if !params_obj.contains_key(&constraint.field)
+                    && let Some(ref default_value) = constraint.default
+                {
+                    params_obj.insert(constraint.field.clone(), default_value.clone());
                 }
             }
         }
@@ -1034,9 +1044,11 @@ mod tests {
         let constraint = SchemaConstraint::uuid("test_uuid", true).unwrap();
 
         // Valid UUIDs
-        assert!(constraint
-            .validate(&json!("12345678-1234-1234-1234-123456789abc"))
-            .is_ok());
+        assert!(
+            constraint
+                .validate(&json!("12345678-1234-1234-1234-123456789abc"))
+                .is_ok()
+        );
         assert!(constraint.validate(&json!("0CD8C06B.855703.I2")).is_ok());
 
         // Invalid UUIDs
@@ -1083,26 +1095,32 @@ mod tests {
             "device": "12345678-1234-1234-1234-123456789abc",
             "action": "on"
         });
-        assert!(validator
-            .validate_tool_parameters("control_device", &params)
-            .is_ok());
+        assert!(
+            validator
+                .validate_tool_parameters("control_device", &params)
+                .is_ok()
+        );
 
         // Invalid device control (missing device)
         let invalid_params = json!({
             "action": "on"
         });
-        assert!(validator
-            .validate_tool_parameters("control_device", &invalid_params)
-            .is_err());
+        assert!(
+            validator
+                .validate_tool_parameters("control_device", &invalid_params)
+                .is_err()
+        );
 
         // Invalid device control (bad action)
         let invalid_params2 = json!({
             "device": "12345678-1234-1234-1234-123456789abc",
             "action": "invalid_action"
         });
-        assert!(validator
-            .validate_tool_parameters("control_device", &invalid_params2)
-            .is_err());
+        assert!(
+            validator
+                .validate_tool_parameters("control_device", &invalid_params2)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1113,14 +1131,18 @@ mod tests {
         assert!(schema["type"] == "object");
         assert!(schema["properties"]["device"]["type"] == "string");
         assert!(schema["properties"]["action"]["enum"].is_array());
-        assert!(schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("device")));
-        assert!(schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("action")));
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("device"))
+        );
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("action"))
+        );
     }
 
     #[test]

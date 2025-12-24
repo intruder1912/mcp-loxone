@@ -358,46 +358,46 @@ impl KeyStore {
         }
 
         // Check expiration
-        if let Some(expires_at) = key.expires_at {
-            if Utc::now() > expires_at {
-                return Err(LoxoneError::authentication("API key has expired"));
-            }
+        if let Some(expires_at) = key.expires_at
+            && Utc::now() > expires_at
+        {
+            return Err(LoxoneError::authentication("API key has expired"));
         }
 
         // Check IP whitelist
-        if !key.ip_whitelist.is_empty() {
-            if let Some(ip) = client_ip {
-                let ip_str = ip.to_string();
-                let allowed = key.ip_whitelist.iter().any(|allowed| {
-                    // Support CIDR notation
-                    if allowed.contains('/') {
-                        // Implement CIDR matching
-                        #[allow(clippy::collapsible_match)]
-                        match (parse_cidr(allowed), ip) {
-                            (Some((network, prefix_len)), std::net::IpAddr::V4(ip_v4)) => {
-                                if let std::net::IpAddr::V4(net_v4) = network {
-                                    check_ipv4_in_cidr(ip_v4, net_v4, prefix_len)
-                                } else {
-                                    false
-                                }
+        if !key.ip_whitelist.is_empty()
+            && let Some(ip) = client_ip
+        {
+            let ip_str = ip.to_string();
+            let allowed = key.ip_whitelist.iter().any(|allowed| {
+                // Support CIDR notation
+                if allowed.contains('/') {
+                    // Implement CIDR matching
+                    #[allow(clippy::collapsible_match)]
+                    match (parse_cidr(allowed), ip) {
+                        (Some((network, prefix_len)), std::net::IpAddr::V4(ip_v4)) => {
+                            if let std::net::IpAddr::V4(net_v4) = network {
+                                check_ipv4_in_cidr(ip_v4, net_v4, prefix_len)
+                            } else {
+                                false
                             }
-                            (Some((network, prefix_len)), std::net::IpAddr::V6(ip_v6)) => {
-                                if let std::net::IpAddr::V6(net_v6) = network {
-                                    check_ipv6_in_cidr(ip_v6, net_v6, prefix_len)
-                                } else {
-                                    false
-                                }
-                            }
-                            _ => false,
                         }
-                    } else {
-                        allowed == &ip_str
+                        (Some((network, prefix_len)), std::net::IpAddr::V6(ip_v6)) => {
+                            if let std::net::IpAddr::V6(net_v6) = network {
+                                check_ipv6_in_cidr(ip_v6, net_v6, prefix_len)
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
                     }
-                });
-
-                if !allowed {
-                    return Err(LoxoneError::authentication("IP address not allowed"));
+                } else {
+                    allowed == &ip_str
                 }
+            });
+
+            if !allowed {
+                return Err(LoxoneError::authentication("IP address not allowed"));
             }
         }
 

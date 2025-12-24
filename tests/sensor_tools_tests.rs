@@ -8,7 +8,7 @@ use loxone_mcp_rust::{
         DiscoveredSensor, SensorStateHistory, SensorStatistics, SensorType, StateChangeEvent,
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 #[cfg(test)]

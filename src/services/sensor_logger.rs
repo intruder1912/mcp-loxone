@@ -67,10 +67,10 @@ impl SensorStateLogger {
             loop {
                 interval.tick().await;
                 let data = history.read().await;
-                if let Ok(json) = serde_json::to_string_pretty(&*data) {
-                    if let Err(e) = tokio::fs::write(&log_file, json).await {
-                        tracing::warn!("Failed to persist sensor history: {}", e);
-                    }
+                if let Ok(json) = serde_json::to_string_pretty(&*data)
+                    && let Err(e) = tokio::fs::write(&log_file, json).await
+                {
+                    tracing::warn!("Failed to persist sensor history: {}", e);
                 }
             }
         });

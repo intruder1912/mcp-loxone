@@ -5,17 +5,17 @@
 
 use crate::client::load_balancer::{LoadBalancer, LoadBalancingStrategy};
 use crate::client::{
-    client_factory::{AdaptiveClientFactory, ClientFactory, ServerCapabilities},
     LoxoneClient,
+    client_factory::{AdaptiveClientFactory, ClientFactory, ServerCapabilities},
 };
-use crate::config::{credentials::LoxoneCredentials, AuthMethod, LoxoneConfig};
+use crate::config::{AuthMethod, LoxoneConfig, credentials::LoxoneCredentials};
 use crate::error::{LoxoneError, Result};
 use crate::error_recovery::{CircuitBreaker, CircuitBreakerConfig};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};

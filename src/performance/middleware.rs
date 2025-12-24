@@ -98,10 +98,10 @@ impl PerformanceMiddleware {
         let headers = response.headers_mut();
 
         // Add timing information
-        if let Some(duration) = measurement.timing.get_duration() {
-            if let Ok(header_value) = format!("{}ms", duration.as_millis()).parse() {
-                headers.insert("X-Response-Time", header_value);
-            }
+        if let Some(duration) = measurement.timing.get_duration()
+            && let Ok(header_value) = format!("{}ms", duration.as_millis()).parse()
+        {
+            headers.insert("X-Response-Time", header_value);
         }
 
         // Add request ID for tracing
@@ -110,16 +110,16 @@ impl PerformanceMiddleware {
         }
 
         // Add performance metrics if available
-        if let Some(cpu) = measurement.resource_usage.cpu_usage {
-            if let Ok(header_value) = format!("{cpu:.1}").parse() {
-                headers.insert("X-CPU-Usage", header_value);
-            }
+        if let Some(cpu) = measurement.resource_usage.cpu_usage
+            && let Ok(header_value) = format!("{cpu:.1}").parse()
+        {
+            headers.insert("X-CPU-Usage", header_value);
         }
 
-        if let Some(memory) = measurement.resource_usage.memory_usage {
-            if let Ok(header_value) = format!("{memory}").parse() {
-                headers.insert("X-Memory-Usage", header_value);
-            }
+        if let Some(memory) = measurement.resource_usage.memory_usage
+            && let Ok(header_value) = format!("{memory}").parse()
+        {
+            headers.insert("X-Memory-Usage", header_value);
         }
 
         // Add performance score if issues detected
@@ -135,10 +135,10 @@ impl PerformanceMiddleware {
                 })
                 .count();
 
-            if critical_issues > 0 {
-                if let Ok(header_value) = "critical-issues-detected".parse() {
-                    headers.insert("X-Performance-Warning", header_value);
-                }
+            if critical_issues > 0
+                && let Ok(header_value) = "critical-issues-detected".parse()
+            {
+                headers.insert("X-Performance-Warning", header_value);
             }
         }
     }

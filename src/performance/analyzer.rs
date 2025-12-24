@@ -856,56 +856,54 @@ impl PerformanceAnalyzer {
         }
 
         // Check resource usage
-        if let Some(cpu) = measurement.resource_usage.cpu_usage {
-            if cpu
+        if let Some(cpu) = measurement.resource_usage.cpu_usage
+            && cpu
                 > self
                     .config
                     .alert_thresholds
                     .resource_usage
                     .cpu_critical_percent
-            {
-                issues.push(crate::performance::PerformanceIssue {
-                    severity: crate::performance::PerformanceIssueSeverity::Critical,
-                    issue_type: crate::performance::PerformanceIssueType::HighCpuUsage,
-                    description: format!("Critical CPU usage: {cpu:.1}%"),
-                    recommendation: Some(
-                        "Scale resources or optimize CPU-intensive operations".to_string(),
-                    ),
-                    metric_value: Some(cpu),
-                    threshold: Some(
-                        self.config
-                            .alert_thresholds
-                            .resource_usage
-                            .cpu_critical_percent,
-                    ),
-                });
-            }
+        {
+            issues.push(crate::performance::PerformanceIssue {
+                severity: crate::performance::PerformanceIssueSeverity::Critical,
+                issue_type: crate::performance::PerformanceIssueType::HighCpuUsage,
+                description: format!("Critical CPU usage: {cpu:.1}%"),
+                recommendation: Some(
+                    "Scale resources or optimize CPU-intensive operations".to_string(),
+                ),
+                metric_value: Some(cpu),
+                threshold: Some(
+                    self.config
+                        .alert_thresholds
+                        .resource_usage
+                        .cpu_critical_percent,
+                ),
+            });
         }
 
-        if let Some(memory) = measurement.resource_usage.memory_usage {
-            if memory
+        if let Some(memory) = measurement.resource_usage.memory_usage
+            && memory
                 > self
                     .config
                     .alert_thresholds
                     .resource_usage
                     .memory_critical_bytes
-            {
-                issues.push(crate::performance::PerformanceIssue {
-                    severity: crate::performance::PerformanceIssueSeverity::Critical,
-                    issue_type: crate::performance::PerformanceIssueType::HighMemoryUsage,
-                    description: format!("Critical memory usage: {memory} bytes"),
-                    recommendation: Some(
-                        "Investigate memory leaks or scale memory resources".to_string(),
-                    ),
-                    metric_value: Some(memory as f64),
-                    threshold: Some(
-                        self.config
-                            .alert_thresholds
-                            .resource_usage
-                            .memory_critical_bytes as f64,
-                    ),
-                });
-            }
+        {
+            issues.push(crate::performance::PerformanceIssue {
+                severity: crate::performance::PerformanceIssueSeverity::Critical,
+                issue_type: crate::performance::PerformanceIssueType::HighMemoryUsage,
+                description: format!("Critical memory usage: {memory} bytes"),
+                recommendation: Some(
+                    "Investigate memory leaks or scale memory resources".to_string(),
+                ),
+                metric_value: Some(memory as f64),
+                threshold: Some(
+                    self.config
+                        .alert_thresholds
+                        .resource_usage
+                        .memory_critical_bytes as f64,
+                ),
+            });
         }
 
         Ok(issues)
@@ -1200,57 +1198,56 @@ impl PerformanceAnalyzer {
         for measurement in measurements.iter().rev().take(10) {
             // Check recent measurements
             // Check response time alerts
-            if let Some(duration) = measurement.timing.get_duration() {
-                if duration > self.config.alert_thresholds.response_time.critical {
-                    alerts.push(PerformanceAlert {
-                        alert_type: AlertType::ResponseTime,
-                        level: AlertLevel::Critical,
-                        metric: "response_time".to_string(),
-                        current_value: duration.as_millis() as f64,
-                        threshold: self
-                            .config
-                            .alert_thresholds
-                            .response_time
-                            .critical
-                            .as_millis() as f64,
-                        message: format!(
-                            "Response time {} exceeds critical threshold",
-                            duration.as_millis()
-                        ),
-                        triggered_at: SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_nanos() as u64,
-                    });
-                }
+            if let Some(duration) = measurement.timing.get_duration()
+                && duration > self.config.alert_thresholds.response_time.critical
+            {
+                alerts.push(PerformanceAlert {
+                    alert_type: AlertType::ResponseTime,
+                    level: AlertLevel::Critical,
+                    metric: "response_time".to_string(),
+                    current_value: duration.as_millis() as f64,
+                    threshold: self
+                        .config
+                        .alert_thresholds
+                        .response_time
+                        .critical
+                        .as_millis() as f64,
+                    message: format!(
+                        "Response time {} exceeds critical threshold",
+                        duration.as_millis()
+                    ),
+                    triggered_at: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos() as u64,
+                });
             }
 
             // Check resource usage alerts
-            if let Some(cpu) = measurement.resource_usage.cpu_usage {
-                if cpu
+            if let Some(cpu) = measurement.resource_usage.cpu_usage
+                && cpu
                     > self
                         .config
                         .alert_thresholds
                         .resource_usage
                         .cpu_critical_percent
-                {
-                    alerts.push(PerformanceAlert {
-                        alert_type: AlertType::CpuUsage,
-                        level: AlertLevel::Critical,
-                        metric: "cpu_usage".to_string(),
-                        current_value: cpu,
-                        threshold: self
-                            .config
-                            .alert_thresholds
-                            .resource_usage
-                            .cpu_critical_percent,
-                        message: format!("CPU usage {cpu:.1}% exceeds critical threshold"),
-                        triggered_at: SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_nanos() as u64,
-                    });
-                }
+            {
+                alerts.push(PerformanceAlert {
+                    alert_type: AlertType::CpuUsage,
+                    level: AlertLevel::Critical,
+                    metric: "cpu_usage".to_string(),
+                    current_value: cpu,
+                    threshold: self
+                        .config
+                        .alert_thresholds
+                        .resource_usage
+                        .cpu_critical_percent,
+                    message: format!("CPU usage {cpu:.1}% exceeds critical threshold"),
+                    triggered_at: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos() as u64,
+                });
             }
         }
 

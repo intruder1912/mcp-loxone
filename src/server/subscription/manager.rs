@@ -248,13 +248,12 @@ impl ResourceSubscriptionManager {
         timestamp: SystemTime,
     ) -> Result<()> {
         let mut client_subs = self.client_subscriptions.write().await;
-        if let Some(subscriptions) = client_subs.get_mut(client_id) {
-            if let Some(subscription) = subscriptions
+        if let Some(subscriptions) = client_subs.get_mut(client_id)
+            && let Some(subscription) = subscriptions
                 .iter_mut()
                 .find(|sub| sub.resource_uri == resource_uri)
-            {
-                subscription.last_notification = Some(timestamp);
-            }
+        {
+            subscription.last_notification = Some(timestamp);
         }
         Ok(())
     }

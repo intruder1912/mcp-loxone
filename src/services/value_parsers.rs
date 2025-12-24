@@ -112,17 +112,16 @@ pub struct TemperatureParser;
 impl ValueParser for TemperatureParser {
     fn parse(&self, raw_value: &Value) -> Result<ParsedValue> {
         // Try LL.value first (most reliable for sensors)
-        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object()) {
-            if let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str()) {
-                if let Some(numeric) = extract_temperature(value_str) {
-                    return Ok(ParsedValue {
-                        numeric_value: Some(numeric),
-                        formatted_value: format!("{numeric:.1}°C"),
-                        unit: Some("°C".to_string()),
-                        metadata: HashMap::new(),
-                    });
-                }
-            }
+        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object())
+            && let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str())
+            && let Some(numeric) = extract_temperature(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{numeric:.1}°C"),
+                unit: Some("°C".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         // Fallback to direct value
@@ -136,15 +135,15 @@ impl ValueParser for TemperatureParser {
         }
 
         // Try parsing as string
-        if let Some(value_str) = raw_value.as_str() {
-            if let Some(numeric) = extract_temperature(value_str) {
-                return Ok(ParsedValue {
-                    numeric_value: Some(numeric),
-                    formatted_value: format!("{numeric:.1}°C"),
-                    unit: Some("°C".to_string()),
-                    metadata: HashMap::new(),
-                });
-            }
+        if let Some(value_str) = raw_value.as_str()
+            && let Some(numeric) = extract_temperature(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{numeric:.1}°C"),
+                unit: Some("°C".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         Err(LoxoneError::parsing_error("Unable to parse temperature"))
@@ -168,17 +167,16 @@ pub struct HumidityParser;
 
 impl ValueParser for HumidityParser {
     fn parse(&self, raw_value: &Value) -> Result<ParsedValue> {
-        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object()) {
-            if let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str()) {
-                if let Some(numeric) = extract_percentage(value_str) {
-                    return Ok(ParsedValue {
-                        numeric_value: Some(numeric),
-                        formatted_value: format!("{}%", numeric.round() as i32),
-                        unit: Some("%".to_string()),
-                        metadata: HashMap::new(),
-                    });
-                }
-            }
+        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object())
+            && let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str())
+            && let Some(numeric) = extract_percentage(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{}%", numeric.round() as i32),
+                unit: Some("%".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         if let Some(numeric) = raw_value.as_f64() {
@@ -190,15 +188,15 @@ impl ValueParser for HumidityParser {
             });
         }
 
-        if let Some(value_str) = raw_value.as_str() {
-            if let Some(numeric) = extract_percentage(value_str) {
-                return Ok(ParsedValue {
-                    numeric_value: Some(numeric),
-                    formatted_value: format!("{}%", numeric.round() as i32),
-                    unit: Some("%".to_string()),
-                    metadata: HashMap::new(),
-                });
-            }
+        if let Some(value_str) = raw_value.as_str()
+            && let Some(numeric) = extract_percentage(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{}%", numeric.round() as i32),
+                unit: Some("%".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         Err(LoxoneError::parsing_error("Unable to parse humidity"))
@@ -222,17 +220,16 @@ pub struct LightParser;
 
 impl ValueParser for LightParser {
     fn parse(&self, raw_value: &Value) -> Result<ParsedValue> {
-        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object()) {
-            if let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str()) {
-                if let Some(numeric) = extract_lux(value_str) {
-                    return Ok(ParsedValue {
-                        numeric_value: Some(numeric),
-                        formatted_value: format!("{numeric:.0} Lx"),
-                        unit: Some("Lx".to_string()),
-                        metadata: HashMap::new(),
-                    });
-                }
-            }
+        if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object())
+            && let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str())
+            && let Some(numeric) = extract_lux(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{numeric:.0} Lx"),
+                unit: Some("Lx".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         if let Some(numeric) = raw_value.as_f64() {
@@ -244,15 +241,15 @@ impl ValueParser for LightParser {
             });
         }
 
-        if let Some(value_str) = raw_value.as_str() {
-            if let Some(numeric) = extract_lux(value_str) {
-                return Ok(ParsedValue {
-                    numeric_value: Some(numeric),
-                    formatted_value: format!("{numeric:.0} Lx"),
-                    unit: Some("Lx".to_string()),
-                    metadata: HashMap::new(),
-                });
-            }
+        if let Some(value_str) = raw_value.as_str()
+            && let Some(numeric) = extract_lux(value_str)
+        {
+            return Ok(ParsedValue {
+                numeric_value: Some(numeric),
+                formatted_value: format!("{numeric:.0} Lx"),
+                unit: Some("Lx".to_string()),
+                metadata: HashMap::new(),
+            });
         }
 
         Err(LoxoneError::parsing_error("Unable to parse illuminance"))
@@ -701,10 +698,10 @@ fn extract_lux(value_str: &str) -> Option<f64> {
 
 fn extract_numeric_with_unit(raw_value: &Value, units: &[&str]) -> Option<(f64, String)> {
     // Try LL.value first
-    if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object()) {
-        if let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str()) {
-            return parse_value_with_unit(value_str, units);
-        }
+    if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object())
+        && let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str())
+    {
+        return parse_value_with_unit(value_str, units);
     }
 
     // Try direct string
@@ -739,10 +736,10 @@ fn parse_value_with_unit(value_str: &str, units: &[&str]) -> Option<(f64, String
 }
 
 fn extract_percentage_or_number(raw_value: &Value) -> Option<f64> {
-    if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object()) {
-        if let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str()) {
-            return extract_percentage(value_str);
-        }
+    if let Some(ll_obj) = raw_value.get("LL").and_then(|v| v.as_object())
+        && let Some(value_str) = ll_obj.get("value").and_then(|v| v.as_str())
+    {
+        return extract_percentage(value_str);
     }
 
     if let Some(numeric) = raw_value.as_f64() {
