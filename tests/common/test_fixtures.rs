@@ -5,6 +5,7 @@
 
 use loxone_mcp_rust::config::{CredentialStore, LoxoneConfig, ServerConfig};
 use rstest::*;
+use serial_test::serial;
 use std::time::Duration;
 use temp_env::with_vars;
 use url::Url;
@@ -187,6 +188,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_with_env_isolation() {
         with_test_env(|| {
             assert_eq!(std::env::var("LOXONE_USER").unwrap(), "test_user");
