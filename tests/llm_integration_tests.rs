@@ -213,9 +213,12 @@ async fn test_sampling_client_manager_initialization() {
     // Test 1: Manager with default configuration
     // Set clean environment
     for (key, value) in get_clean_env() {
-        match value {
-            Some(v) => std::env::set_var(key, v),
-            None => std::env::remove_var(key),
+        // SAFETY: Tests run serially and don't spawn threads that read env vars
+        unsafe {
+            match value {
+                Some(v) => std::env::set_var(key, v),
+                None => std::env::remove_var(key),
+            }
         }
     }
 

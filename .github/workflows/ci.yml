@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: ["1.79", "stable"]
+        rust: ["1.85", "stable"]  # 1.85 is minimum for Rust 2024 edition
     steps:
       - uses: actions/checkout@v6
       

@@ -3,7 +3,7 @@
 //! Tests for get_devices_by_category, get_available_capabilities,
 //! control_multiple_devices, and other recently added tools.
 
-use loxone_mcp_rust::{client::LoxoneDevice, tools::DeviceStats};
+use loxone_mcp_rust::client::LoxoneDevice;
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -432,7 +432,19 @@ mod tests {
     #[test]
     fn test_device_discovery_response_structure() {
         let devices = create_test_devices();
-        let stats = DeviceStats::from_devices(&devices);
+
+        // Calculate stats inline (previously DeviceStats)
+        let mut by_category: HashMap<String, usize> = HashMap::new();
+        let mut by_type: HashMap<String, usize> = HashMap::new();
+        let mut by_room: HashMap<String, usize> = HashMap::new();
+
+        for device in &devices {
+            *by_category.entry(device.category.clone()).or_insert(0) += 1;
+            *by_type.entry(device.device_type.clone()).or_insert(0) += 1;
+            if let Some(room) = &device.room {
+                *by_room.entry(room.clone()).or_insert(0) += 1;
+            }
+        }
 
         // Test discovery response structure
         let discovery_response = json!({
@@ -445,10 +457,10 @@ mod tests {
                 "states": d.states
             })).collect::<Vec<_>>(),
             "statistics": {
-                "total_devices": stats.total_devices,
-                "by_category": stats.by_category,
-                "by_type": stats.by_type,
-                "by_room": stats.by_room
+                "total_devices": devices.len(),
+                "by_category": by_category,
+                "by_type": by_type,
+                "by_room": by_room
             },
             "total_found": devices.len()
         });
