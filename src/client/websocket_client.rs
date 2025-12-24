@@ -2598,8 +2598,8 @@ impl LoxoneClient for LoxoneWebSocketClient {
 
 impl LoxoneWebSocketClient {
     /// Map Loxone device type to sensor type for logging
-    fn map_device_type_to_sensor_type(device_type: &str) -> crate::tools::sensors::SensorType {
-        use crate::tools::sensors::SensorType;
+    fn map_device_type_to_sensor_type(device_type: &str) -> crate::services::SensorType {
+        use crate::services::SensorType;
 
         match device_type {
             // Door/Window sensors
@@ -2609,16 +2609,16 @@ impl LoxoneWebSocketClient {
             "PresenceDetector" | "MotionSensor" | "PresenceSensor" => SensorType::Motion,
 
             // Temperature sensors
-            "TemperatureSensor" | "Thermometer" => SensorType::Temperature,
+            "TemperatureSensor" | "Thermometer" => SensorType::TemperatureSimple,
 
             // Humidity sensors
-            "HumiditySensor" => SensorType::Humidity,
+            "HumiditySensor" => SensorType::HumiditySimple,
 
             // Light sensors
             "LightSensor" | "LightController" | "LightControllerV2" => SensorType::Light,
 
             // Air quality sensors
-            "AirQualitySensor" | "CO2Sensor" => SensorType::AirQuality,
+            "AirQualitySensor" | "CO2Sensor" => SensorType::AirQualitySimple,
 
             // Weather devices (general analog)
             "WeatherStation" | "InfoOnlyAnalog" => SensorType::Analog,
@@ -2628,7 +2628,7 @@ impl LoxoneWebSocketClient {
 
             // HVAC sensors (temperature)
             "IRoomControllerV2" | "RoomController" | "ThermostatController" => {
-                SensorType::Temperature
+                SensorType::TemperatureSimple
             }
 
             // Security sensors (door/window as fallback)

@@ -12,6 +12,31 @@ use std::collections::HashMap;
 /// Comprehensive sensor type classification
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SensorType {
+    // ══════════════════════════════════════════════════════════════════
+    // Simple variants (backward compatibility for legacy code)
+    // These are used for basic categorization without detailed metadata
+    // ══════════════════════════════════════════════════════════════════
+    /// Simple door/window sensor (legacy)
+    DoorWindow,
+    /// Simple motion sensor (legacy)
+    Motion,
+    /// Simple analog sensor (legacy)
+    Analog,
+    /// Simple light sensor (legacy)
+    Light,
+    /// Simple energy sensor (legacy)
+    Energy,
+    /// Simple temperature sensor (legacy - no unit/range metadata)
+    TemperatureSimple,
+    /// Simple humidity sensor (legacy - no range metadata)
+    HumiditySimple,
+    /// Simple air quality sensor (legacy - no scale metadata)
+    AirQualitySimple,
+
+    // ══════════════════════════════════════════════════════════════════
+    // Rich typed variants (with units and metadata)
+    // ══════════════════════════════════════════════════════════════════
+
     // Environmental sensors
     Temperature {
         unit: TemperatureUnit,

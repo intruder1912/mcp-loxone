@@ -5,7 +5,7 @@
 
 use crate::client::{ClientContext, LoxoneClient, LoxoneDevice};
 use crate::error::Result;
-use crate::tools::sensors::SensorType;
+use crate::services::SensorType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -849,21 +849,23 @@ fn is_open_state(value: &serde_json::Value) -> bool {
 #[allow(dead_code)]
 fn human_readable_state(value: &serde_json::Value, sensor_type: Option<&SensorType>) -> String {
     match sensor_type {
-        Some(SensorType::DoorWindow) => {
+        Some(SensorType::DoorWindow) | Some(SensorType::DoorWindowContact) => {
             if is_open_state(value) {
                 "Open".to_string()
             } else {
                 "Closed".to_string()
             }
         }
-        Some(SensorType::Motion) => {
+        Some(SensorType::Motion)
+        | Some(SensorType::MotionDetector)
+        | Some(SensorType::PresenceSensor) => {
             if value.as_bool().unwrap_or(false) {
                 "Motion detected".to_string()
             } else {
                 "No motion".to_string()
             }
         }
-        Some(SensorType::Temperature) => {
+        Some(SensorType::TemperatureSimple) | Some(SensorType::Temperature { .. }) => {
             if let Some(temp) = value.as_f64() {
                 format!("{temp:.1}°C")
             } else {
@@ -877,7 +879,7 @@ fn human_readable_state(value: &serde_json::Value, sensor_type: Option<&SensorTy
                 "Unknown".to_string()
             }
         }
-        Some(SensorType::Light) => {
+        Some(SensorType::Light) | Some(SensorType::Illuminance { .. }) => {
             if let Some(lux) = value.as_f64() {
                 format!("{lux:.0} lux")
             } else {

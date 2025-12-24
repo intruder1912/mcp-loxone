@@ -197,7 +197,7 @@ pub struct ClientContext {
     pub last_update: Arc<RwLock<Option<chrono::DateTime<chrono::Utc>>>>,
 
     /// Sensor state logger (optional)
-    pub sensor_logger: Arc<RwLock<Option<Arc<crate::tools::sensors::SensorStateLogger>>>>,
+    pub sensor_logger: Arc<RwLock<Option<Arc<crate::services::SensorStateLogger>>>>,
 }
 
 impl Default for ClientContext {
@@ -438,7 +438,7 @@ impl ClientContext {
 
     /// Initialize sensor state logger
     pub async fn initialize_sensor_logger(&self, log_file: std::path::PathBuf) -> Result<()> {
-        let logger = Arc::new(crate::tools::sensors::SensorStateLogger::new(log_file));
+        let logger = Arc::new(crate::services::SensorStateLogger::new(log_file));
 
         // Load existing history from disk
         if let Err(e) = logger.load_from_disk().await {
@@ -456,7 +456,7 @@ impl ClientContext {
     }
 
     /// Get sensor state logger
-    pub async fn get_sensor_logger(&self) -> Option<Arc<crate::tools::sensors::SensorStateLogger>> {
+    pub async fn get_sensor_logger(&self) -> Option<Arc<crate::services::SensorStateLogger>> {
         self.sensor_logger.read().await.clone()
     }
 
@@ -467,7 +467,7 @@ impl ClientContext {
         old_value: serde_json::Value,
         new_value: serde_json::Value,
         sensor_name: Option<String>,
-        sensor_type: Option<crate::tools::sensors::SensorType>,
+        sensor_type: Option<crate::services::SensorType>,
         room: Option<String>,
     ) {
         if let Some(logger) = self.get_sensor_logger().await {

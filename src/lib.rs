@@ -6,7 +6,7 @@
 //!
 //! # Features
 //!
-//! - 30+ MCP tools for device control and monitoring
+//! - 27 MCP tools via macro-based implementation for device control and monitoring
 //! - Real-time sensor discovery and monitoring
 //! - Room-based device organization
 //! - Climate control with 6 room controllers
@@ -33,7 +33,6 @@ pub mod server;
 pub mod services;
 pub mod shared_styles;
 pub mod storage;
-pub mod tools;
 pub mod utils;
 pub mod validation;
 
