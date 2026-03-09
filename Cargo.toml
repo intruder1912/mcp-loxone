@@ -101,6 +101,10 @@ path = "src/bin/setup.rs"
 name = "loxone-mcp-auth"
 path = "src/bin/loxone-mcp-auth.rs"
 
+[[bin]]
+name = "loxone-cli"
+path = "src/bin/loxone-cli.rs"
+
 # Development utilities
 [[bin]]
 name = "loxone-mcp-test-endpoints"
