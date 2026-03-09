@@ -1,27 +1,48 @@
-# Loxone MCP Server
+<div align="center">
 
-> **Bridging Loxone home automation with the Model Context Protocol ecosystem through high-performance Rust implementation**
+# 🏠 Loxone MCP Server
 
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
-[![CI](https://github.com/avrabe/mcp-loxone/actions/workflows/ci.yml/badge.svg)](https://github.com/avrabe/mcp-loxone/actions)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+<sup>Control your Loxone smart home through the Model Context Protocol</sup>
 
-A Model Context Protocol (MCP) server that enables programmatic control of Loxone home automation systems. This implementation provides comprehensive device control through 17 specialized tools and 25+ resources, supporting both stdio (for Claude Desktop) and HTTP transports.
+&nbsp;
+
+![Rust](https://img.shields.io/badge/Rust-CE422B?style=flat-square&logo=rust&logoColor=white&labelColor=1a1b27)
+![MCP](https://img.shields.io/badge/MCP-0.17-654FF0?style=flat-square&labelColor=1a1b27)
+![Edition](https://img.shields.io/badge/Edition-2024-blue?style=flat-square&labelColor=1a1b27)
+[![CI](https://img.shields.io/github/actions/workflow/status/avrabe/mcp-loxone/ci.yml?style=flat-square&label=CI&labelColor=1a1b27)](https://github.com/avrabe/mcp-loxone/actions)
+[![License](https://img.shields.io/badge/License-MIT%20%7C%20Apache--2.0-blue?style=flat-square&labelColor=1a1b27)](LICENSE-MIT)
+
+</div>
+
+&nbsp;
+
+An async Rust MCP server that connects AI assistants to Loxone Miniservers. Control lights, blinds, climate, security, audio, and more — all through standardized MCP tools and resources.
+
+> [!NOTE]
+> Built on the [PulseEngine MCP framework](https://github.com/pulseengine) v0.17.0 for standardized protocol handling, authentication, and transport layers.
 
 ## Features
 
-- **Comprehensive Control**: 17 MCP tools for device control + 25+ resources for data access
-- **MCP Compliant**: Proper separation of tools (actions) and resources (read-only data)
-- **Multiple Transports**: stdio for Claude Desktop, HTTP/SSE for web integrations  
-- **Enhanced Security**: Framework-based authentication with advanced features
-- **Performance Optimized**: Connection pooling, intelligent caching, batch operations
-- **Framework Integration**: Built on PulseEngine MCP framework for standardized protocol handling
+- 🔌 **17 MCP Tools** — Control lights, blinds, HVAC, security, audio, door locks, intercoms, and scenes — all wired to real Miniserver commands
+- 📊 **25+ MCP Resources** — Read-only access to rooms, devices, sensors, energy, weather, and system status with live state
+- 🚀 **Three Transports** — stdio (Claude Desktop), HTTP/SSE (n8n, web clients), and Streamable HTTP
+- 🔐 **Security by Default** — SSL verification on, UUID validation, rate limiting, input sanitization, dev-mode restricted to localhost
+- ⚡ **Async Rust** — Connection pooling, intelligent caching, batch operations
+- 🧊 **Nix Flake** — Reproducible builds with OpenClaw plugin integration
+- 🔑 **Credential Management** — Credential ID system, environment variables, or Infisical vault
 
-## Requirements
+## Quick Start
 
-- Rust 1.70 or higher
-- Loxone Miniserver (Gen 1 or Gen 2)
-- Network access to Miniserver
+```bash
+# Build
+cargo build --release
+
+# Setup credentials
+cargo run --bin loxone-mcp-setup -- --generate-id --name "My Home"
+
+# Run with Claude Desktop
+cargo run --bin loxone-mcp-server -- stdio --credential-id <your-id>
+```
 
 ## Installation
 
@@ -33,207 +54,223 @@ cd mcp-loxone
 cargo build --release
 ```
 
-### Configuration
+### Nix Flake
 
-#### 🆕 Credential ID System (Recommended)
+```bash
+nix build github:avrabe/mcp-loxone
+# Or run directly
+nix run github:avrabe/mcp-loxone
+```
 
-1. **Quick Setup with Credential ID**:
-   ```bash
-   # Interactive setup with ID generation
-   cargo run --bin loxone-mcp-setup --generate-id --name "Main House"
-   
-   # Store credentials manually
-   cargo run --bin loxone-mcp-auth store \
-     --name "Office" \
-     --host 192.168.1.100 \
-     --username admin \
-     --password secure123
-   ```
+### Docker
 
-2. **Manage Multiple Servers**:
-   ```bash
-   # List stored credentials
-   cargo run --bin loxone-mcp-auth list
-   
-   # Test connections
-   cargo run --bin loxone-mcp-auth test <credential-id>
-   ```
+```bash
+docker build -t loxone-mcp .
+docker run -e LOXONE_HOST=192.168.1.100 \
+           -e LOXONE_USER=admin \
+           -e LOXONE_PASS=secret \
+           -p 3001:3001 loxone-mcp
+```
 
-#### Legacy Environment Variables
+## Configuration
 
-1. **Basic Setup**:
-   ```bash
-   cargo run --bin loxone-mcp-setup
-   ```
+### Credential ID (Recommended)
 
-2. **Environment variables**:
-   ```bash
-   export LOXONE_HOST="http://192.168.1.100"
-   export LOXONE_USER="your-username"
-   export LOXONE_PASS="your-password"
-   ```
+```bash
+# Interactive setup — generates a unique credential ID
+cargo run --bin loxone-mcp-setup -- --generate-id --name "Main House"
 
-3. **Production with Infisical** (optional):
-   ```bash
-   export INFISICAL_PROJECT_ID="your-project-id"
-   export INFISICAL_CLIENT_ID="your-client-id"
-   export INFISICAL_CLIENT_SECRET="your-client-secret"
-   export INFISICAL_ENVIRONMENT="production"
-   ```
+# Or store manually
+cargo run --bin loxone-mcp-auth -- store \
+  --name "Office" --host 192.168.1.100 \
+  --username admin --password secure123
 
-#### 🔄 Migration from Environment Variables
+# Manage credentials
+cargo run --bin loxone-mcp-auth -- list
+cargo run --bin loxone-mcp-auth -- test <credential-id>
+```
 
-If you're currently using environment variables, see the [**Credential Migration Guide**](CREDENTIAL_MIGRATION_GUIDE.md) for step-by-step instructions to migrate to the new Credential ID system.
+### Environment Variables
+
+```bash
+export LOXONE_HOST="192.168.1.100"
+export LOXONE_USER="admin"
+export LOXONE_PASS="password"
+```
+
+### Infisical Vault (Production)
+
+```bash
+export INFISICAL_PROJECT_ID="your-project-id"
+export INFISICAL_CLIENT_ID="your-client-id"
+export INFISICAL_CLIENT_SECRET="your-client-secret"
+```
+
+> [!TIP]
+> Migrating from environment variables? See the [Credential Migration Guide](CREDENTIAL_MIGRATION_GUIDE.md).
 
 ## Usage
 
-### Claude Desktop Integration
+### Claude Desktop
 
-#### With Credential ID (Recommended)
+Add to your `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
     "loxone": {
-      "command": "/path/to/loxone-mcp-server",
+      "command": "loxone-mcp-server",
       "args": ["stdio", "--credential-id", "abc123def-456-789"]
     }
   }
 }
 ```
 
-#### Legacy Environment Variables
-```json
-{
-  "mcpServers": {
-    "loxone": {
-      "command": "/path/to/loxone-mcp-server",
-      "args": ["stdio"],
-      "env": {
-        "LOXONE_HOST": "192.168.1.100",
-        "LOXONE_USER": "admin",
-        "LOXONE_PASS": "password"
-      }
-    }
+### HTTP Server (n8n, MCP Inspector)
+
+```bash
+# Standard HTTP/SSE
+loxone-mcp-server http --port 3001 --credential-id <id>
+
+# Streamable HTTP (new MCP Inspector)
+loxone-mcp-server streamable-http --port 3001 --credential-id <id>
+```
+
+### OpenClaw Integration
+
+The flake exports an `openclawPlugin` for [nix-openclaw](https://github.com/openclaw/nix-openclaw):
+
+```nix
+customPlugins = [
+  {
+    source = "github:avrabe/mcp-loxone";
+    config.env = {
+      LOXONE_HOST = "/path/to/secrets/loxone-host";
+      LOXONE_USER = "/path/to/secrets/loxone-user";
+      LOXONE_PASS = "/path/to/secrets/loxone-pass";
+    };
   }
-}
+];
 ```
 
-### HTTP Server (for n8n, web clients)
-
-#### With Credential ID
-```bash
-cargo run --bin loxone-mcp-server http --port 3001 --credential-id abc123def-456-789
-```
-
-#### Legacy Mode
-```bash
-cargo run --bin loxone-mcp-server http --port 3001
-```
-
-### Verify Installation
-
-```bash
-# Test with credential ID
-cargo run --bin loxone-mcp-auth test <credential-id>
-
-# Or list available credentials
-cargo run --bin loxone-mcp-auth list
-```
-
-## Available Tools & Resources
-
-The server implements 17 tools for actions and 25+ resources for data access:
+## Tools & Resources
 
 ### Tools (Actions)
-- **Device Control**: `control_device`, `control_multiple_devices`
-- **Lighting**: `control_lights_unified`, `control_all_lights`, `control_room_lights` 
-- **Blinds/Rolladen**: `control_rolladen_unified`, `control_all_rolladen`, `control_room_rolladen`, `discover_rolladen_capabilities`
-- **Climate**: `set_room_temperature`, `set_room_mode`
-- **Audio**: `control_audio_zone`, `set_audio_volume`
-- **Security**: `arm_alarm`, `disarm_alarm`
-- **Workflows**: `create_workflow`, `execute_workflow_demo`
 
-### Resources (Read-Only Data)
-- **Rooms**: `loxone://rooms`, `loxone://rooms/{room}/devices`, `loxone://rooms/{room}/overview`
-- **Devices**: `loxone://devices/all`, `loxone://devices/category/{category}`, `loxone://devices/type/{type}`
-- **System**: `loxone://system/status`, `loxone://system/capabilities`, `loxone://system/categories`
-- **Sensors**: `loxone://sensors/door-window`, `loxone://sensors/temperature`, `loxone://sensors/motion`
-- **Audio**: `loxone://audio/zones`, `loxone://audio/sources`
-- **And more...** (weather, energy, security, climate)
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Lighting** | `control_light` | On/off, dim 0-100% |
+| **Blinds** | `control_blind` | Up/down/stop, position 0-100% |
+| **Climate** | `set_temperature` | Target temperature with safe range validation |
+| **Security** | `set_security_mode` | Arm, disarm, night, away modes |
+| **Doors** | `control_door_lock` | Lock, unlock, open |
+| **Intercom** | `control_intercom` | Answer, decline, open door |
+| **Audio** | `control_audio` | Play, pause, volume per zone |
+| **Scenes** | `activate_scene` | Trigger named scenes |
+| **General** | `control_device`, `get_*_status` | Direct device control, live status queries |
 
-[Full tool documentation →](docs/tools_reference.md) | [Resource documentation →](docs/resources.md)
+### Resources (Read-Only)
+
+| URI Pattern | Data |
+|-------------|------|
+| `loxone://rooms` | Room listing with device counts |
+| `loxone://rooms/{room}/devices` | Devices in a specific room |
+| `loxone://devices/all` | Full device inventory |
+| `loxone://devices/category/{cat}` | Devices by category |
+| `loxone://sensors/*` | Door/window, temperature, motion |
+| `loxone://audio/zones` | Audio zone configuration |
+| `loxone://system/status` | Miniserver status and capabilities |
+| `loxone://energy/*` | Power monitoring and consumption |
 
 ## Architecture
 
-The server uses an async Rust architecture with:
-
-- **Transport Layer**: Supports stdio and HTTP/SSE
-- **Tool Layer**: Modular tool implementations
-- **Client Layer**: HTTP and WebSocket clients for Miniserver communication
-- **Security Layer**: Authentication, rate limiting, input validation
-- **Cache Layer**: Intelligent state caching with TTL
-
-[Architecture details →](docs/architecture.md)
-
-## Security
-
-- **Framework Authentication**: Enhanced security with PulseEngine MCP v0.4.0
-  - API Key Management with role-based permissions
-  - JWT tokens for stateless sessions  
-  - Encrypted storage with AES-GCM
-  - Vault integration (Infisical support)
-  - 8 predefined security profiles
-- **Rate Limiting**: Configurable per-role limits
-- **Input Validation**: All inputs sanitized and validated
-- **Audit Logging**: Comprehensive activity logging
-
-[Security documentation →](docs/security.md)
+```
+AI Assistant (Claude, n8n, OpenClaw)
+        │
+   MCP Protocol (stdio / HTTP / Streamable HTTP)
+        │
+   ┌────▼─────────────────────────┐
+   │   loxone-mcp-server          │
+   │  ┌─────────────────────────┐ │
+   │  │ Security Layer          │ │
+   │  │ Auth · Rate Limit · TLS │ │
+   │  ├─────────────────────────┤ │
+   │  │ Tool Handlers           │ │
+   │  │ 17 tools → send_command │ │
+   │  ├─────────────────────────┤ │
+   │  │ Loxone Client           │ │
+   │  │ HTTP · WebSocket · Cache│ │
+   │  └─────────────────────────┘ │
+   └────┬─────────────────────────┘
+        │
+   HTTP /jdev/sps/io/{uuid}/{cmd}
+        │
+   Loxone Miniserver
+        │
+   Physical Devices
+```
 
 ## Development
 
-### Building from Source
+### Requirements
+
+- Rust 1.85+ (2024 edition)
+- Loxone Miniserver (Gen 1 or Gen 2)
+
+### Building & Testing
 
 ```bash
-# Development build with debug symbols
-cargo build
+cargo build                                    # Dev build
+cargo test --lib                               # Unit tests
+cargo fmt && cargo clippy -- -D warnings       # Format + lint
+cargo audit                                    # Security audit
+```
 
-# Run tests
-cargo test
+### Live Miniserver Testing
 
-# Format and lint
-cargo fmt && cargo clippy
+```bash
+# Requires network access to Miniserver
+LOXONE_LIVE_TEST=1 cargo test \
+  --test live_miniserver_tests \
+  --features test-utils -- --nocapture
 ```
 
 ### Project Structure
 
 ```
 src/
-├── server/          # MCP protocol implementation
-├── tools/           # Tool implementations
-├── client/          # Loxone client
-├── security/        # Auth and validation
-└── main.rs          # Entry point
+├── server/          # MCP protocol, tool handlers (macro_backend.rs)
+├── client/          # HTTP/WebSocket clients with UUID validation
+├── config/          # Credentials, master key auto-persistence
+├── security/        # Input sanitization, rate limiting, CORS
+├── monitoring/      # Metrics, dashboards, InfluxDB
+├── history/         # Time-series data storage
+├── discovery/       # mDNS network discovery
+└── main.rs          # CLI, transport selection, startup
 ```
 
-## Limitations
+### Binaries
 
-- **WASM Support**: Currently disabled due to tokio compatibility issues
-- **Real-time Updates**: WebSocket subscriptions planned but not yet implemented
-- **Miniserver Version**: Tested with Gen 1 and Gen 2, newer versions may have differences
-
-## Contributing
-
-Contributions are welcome! Please see [contributing.md](contributing.md) for guidelines.
+| Binary | Purpose |
+|--------|---------|
+| `loxone-mcp-server` | Main MCP server (stdio/HTTP/streamable-http) |
+| `loxone-mcp-auth` | Credential management (store, list, test, delete) |
+| `loxone-mcp-setup` | Interactive setup with credential ID generation |
+| `loxone-mcp-test-endpoints` | API endpoint testing (development) |
 
 ## License
 
 Licensed under either of:
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
+- [MIT License](LICENSE-MIT)
+- [Apache License 2.0](LICENSE-APACHE)
 
 at your option.
 
-## Acknowledgments
+<div align="center">
 
-Built on the PulseEngine MCP framework. Special thanks to the Loxone community for protocol documentation.
+&nbsp;
+
+<sub>Built on <a href="https://github.com/pulseengine">PulseEngine</a> MCP framework — async Rust for the Model Context Protocol</sub>
+
+</div>

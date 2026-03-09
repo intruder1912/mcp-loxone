@@ -98,6 +98,11 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    // Ensure the PulseEngine master encryption key is available (issue #23).
+    if let Err(e) = loxone_mcp_rust::config::master_key::ensure_master_key() {
+        tracing::warn!("Failed to ensure master encryption key: {e}");
+    }
+
     println!("\n🔐 Loxone MCP Rust Server Setup");
     println!("========================================");
 
@@ -668,11 +673,11 @@ fn get_password_input() -> Result<String> {
 fn generate_api_key() -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     (0..43) // URL-safe base64 length for 32 bytes
         .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
+            let idx = rng.random_range(0..CHARSET.len());
             CHARSET[idx] as char
         })
         .collect()

@@ -213,7 +213,7 @@ impl ResourceMonitor {
     /// Update resource usage statistics
     async fn update_usage(&self) {
         let mut system = self.system.lock().await;
-        system.refresh_process(self.pid);
+        system.refresh_all();
 
         if let Some(process) = system.process(self.pid) {
             let mut usage = self.usage.lock().await;

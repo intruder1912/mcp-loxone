@@ -6,28 +6,19 @@
 //! - Macro-based: Uses #[mcp_server] and #[mcp_tools] for simplified tool definitions
 //! - Legacy: Uses manual McpBackend implementation for complex HTTP setups
 
-use pulseengine_mcp_auth::AuthenticationManager;
-use pulseengine_mcp_protocol::{
-    ElicitationCapability, FormElicitationCapability, Implementation, PromptsCapability,
-    ProtocolVersion, ResourcesCapability, SamplingCapability, SamplingContextCapability,
-    SamplingToolsCapability, ServerCapabilities, ServerInfo, ToolsCapability,
-    UrlElicitationCapability,
-};
-use pulseengine_mcp_security::SecurityMiddleware;
-use pulseengine_mcp_server::{GenericServerHandler, McpServerBuilder, middleware::MiddlewareStack};
-use pulseengine_mcp_transport::{Transport, create_transport};
+use pulseengine_mcp_server::McpServerBuilder;
 
 use loxone_mcp_rust::{
     Result, ServerConfig as LoxoneServerConfig,
     config::{
         credential_registry::CredentialRegistry, credentials::create_best_credential_manager,
     },
-    server::{framework_backend::create_loxone_backend, macro_backend::LoxoneMcpServer},
+    server::macro_backend::LoxoneMcpServer,
 };
 
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Loxone MCP Server Configuration
@@ -59,6 +50,10 @@ struct Config {
     /// Credential ID (from loxone-mcp-auth)
     #[arg(long, global = true)]
     credential_id: Option<String>,
+
+    /// Disable SSL certificate verification (not recommended for production)
+    #[arg(long, global = true)]
+    insecure: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -152,38 +147,6 @@ impl Config {
     }
 }
 
-/// Get default server info with 0.17.0 protocol types
-#[allow(dead_code)]
-fn get_default_server_info() -> ServerInfo {
-    ServerInfo {
-        protocol_version: ProtocolVersion::default(),
-        capabilities: ServerCapabilities {
-            tools: Some(ToolsCapability { list_changed: None }),
-            resources: Some(ResourcesCapability {
-                subscribe: Some(true),
-                list_changed: None,
-            }),
-            prompts: Some(PromptsCapability { list_changed: None }),
-            logging: None,
-            sampling: Some(SamplingCapability {
-                context: Some(SamplingContextCapability {}),
-                tools: Some(SamplingToolsCapability {}),
-            }),
-            elicitation: Some(ElicitationCapability {
-                form: Some(FormElicitationCapability {}),
-                url: Some(UrlElicitationCapability {}),
-            }),
-            tasks: None,
-        },
-        server_info: Implementation {
-            name: env!("CARGO_PKG_NAME").to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            description: Some("Loxone home automation MCP server".to_string()),
-        },
-        instructions: None,
-    }
-}
-
 /// Load credentials from credential ID
 async fn load_credentials_by_id(credential_id: &str) -> Result<(String, String, String)> {
     let registry = CredentialRegistry::load()?;
@@ -230,6 +193,20 @@ async fn main() -> Result<()> {
     // Validate configuration
     config.validate()?;
 
+    if config.insecure {
+        warn!(
+            "SSL certificate verification is DISABLED (--insecure). This is not recommended for production use."
+        );
+    }
+
+    // Ensure the PulseEngine master encryption key is available.
+    // This prevents the "aead::Error" on restart (issue #23).
+    if let Err(e) = loxone_mcp_rust::config::master_key::ensure_master_key() {
+        tracing::warn!(
+            "Failed to ensure master encryption key (falling back to framework default): {e}"
+        );
+    }
+
     info!(
         "🚀 Starting Loxone MCP Server v{}",
         env!("CARGO_PKG_VERSION")
@@ -272,271 +249,149 @@ async fn main() -> Result<()> {
         }
     };
 
-    // For ALL stdio modes, use the macro-based server
-    if let TransportCommand::Stdio { offline } = &config.transport {
-        LoxoneMcpServer::configure_stdio_logging();
+    // Build a LoxoneMcpServer with Loxone client for all online modes
+    let build_mcp_server =
+        |loxone_host: &str, loxone_user: &str, loxone_password: &str, insecure: bool| {
+            let host = loxone_host.to_string();
+            let user = loxone_user.to_string();
+            let pass = loxone_password.to_string();
+            async move {
+                use loxone_mcp_rust::client::{ClientContext, LoxoneHttpClient};
+                use loxone_mcp_rust::config::credentials::LoxoneCredentials;
+                use loxone_mcp_rust::services::SensorTypeRegistry;
 
-        let server = if *offline {
-            info!("🚀 Starting macro-based MCP server in offline mode");
-            LoxoneMcpServer::with_defaults()
-        } else {
-            info!("🚀 Starting macro-based MCP server with Loxone connection");
-
-            // Create Loxone client for online mode
-            use loxone_mcp_rust::client::{ClientContext, LoxoneHttpClient};
-            use loxone_mcp_rust::config::credentials::LoxoneCredentials;
-            use loxone_mcp_rust::services::SensorTypeRegistry;
-
-            let loxone_url: url::Url = format!("http://{loxone_host}")
-                .parse()
-                .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
-
-            let loxone_cfg = loxone_mcp_rust::config::LoxoneConfig {
-                url: loxone_url,
-                timeout: std::time::Duration::from_secs(30),
-                verify_ssl: false,
-                ..Default::default()
-            };
-
-            let credentials = LoxoneCredentials {
-                username: loxone_user.clone(),
-                password: _loxone_password.clone(),
-                api_key: None,
-                #[cfg(feature = "crypto-openssl")]
-                public_key: None,
-            };
-
-            let client = LoxoneHttpClient::new(loxone_cfg, credentials)
-                .await
-                .map_err(|e| {
-                    loxone_mcp_rust::LoxoneError::connection(format!(
-                        "Failed to create client: {e}"
-                    ))
+                let loxone_url: url::Url = format!("http://{host}").parse().map_err(|e| {
+                    loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
                 })?;
 
-            // Get context from the client before wrapping in Arc
-            let context = Arc::new(ClientContext::new());
-            let client_arc: Arc<dyn loxone_mcp_rust::client::LoxoneClient> = Arc::new(client);
-
-            // Create value resolver with required dependencies
-            let sensor_registry = Arc::new(SensorTypeRegistry::new());
-            let value_resolver = Arc::new(loxone_mcp_rust::services::UnifiedValueResolver::new(
-                client_arc.clone(),
-                sensor_registry,
-            ));
-
-            info!("✅ Loxone client connected");
-
-            LoxoneMcpServer::with_context(
-                client_arc,
-                context,
-                value_resolver,
-                None, // state_manager
-                LoxoneServerConfig::default(),
-            )
-        };
-
-        let mut mcp_server = server.serve_stdio().await.map_err(|e| {
-            loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}"))
-        })?;
-
-        info!("✅ Macro-based server started successfully");
-        mcp_server
-            .run()
-            .await
-            .map_err(|e| loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}")))?;
-
-        return Ok(());
-    }
-
-    // Create Loxone configuration
-    let loxone_config = match &config.transport {
-        TransportCommand::Stdio { offline } => {
-            if *offline {
-                // This branch is now handled above, but kept for completeness
-                info!("Running in offline mode - no Loxone connection");
-                LoxoneServerConfig::offline_mode()
-            } else {
-                let mut server_config = LoxoneServerConfig::default();
-                server_config.loxone.url =
-                    format!("http://{loxone_host}").parse().map_err(|e| {
-                        loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
-                    })?;
-                server_config.loxone.username = loxone_user.clone();
-                server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                server_config.loxone.verify_ssl = false;
-                server_config
-            }
-        }
-        TransportCommand::Http { dev_mode, .. } => {
-            if *dev_mode {
-                info!("Running in development mode - minimal configuration");
-                LoxoneServerConfig::dev_mode()
-            } else {
-                let mut server_config = LoxoneServerConfig::default();
-                server_config.loxone.url =
-                    format!("http://{loxone_host}").parse().map_err(|e| {
-                        loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}"))
-                    })?;
-                server_config.loxone.username = loxone_user.clone();
-                server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                server_config.loxone.verify_ssl = false;
-                server_config
-            }
-        }
-        TransportCommand::StreamableHttp { .. } => {
-            let mut server_config = LoxoneServerConfig::default();
-            server_config.loxone.url = format!("https://{loxone_host}")
-                .parse()
-                .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
-            server_config.loxone.username = loxone_user.clone();
-            server_config.loxone.timeout = std::time::Duration::from_secs(30);
-            server_config.loxone.verify_ssl = false;
-            server_config
-        }
-    };
-
-    // Create framework authentication manager
-    let framework_auth_manager = {
-        let auth_config = match &config.transport {
-            TransportCommand::Http { dev_mode, .. } if !dev_mode => {
-                pulseengine_mcp_auth::AuthConfig {
-                    enabled: true,
+                let loxone_cfg = loxone_mcp_rust::config::LoxoneConfig {
+                    url: loxone_url,
+                    timeout: std::time::Duration::from_secs(30),
+                    verify_ssl: !insecure,
                     ..Default::default()
-                }
+                };
+
+                let credentials = LoxoneCredentials {
+                    username: user,
+                    password: pass,
+                    api_key: None,
+                    #[cfg(feature = "crypto-openssl")]
+                    public_key: None,
+                };
+
+                let client = LoxoneHttpClient::new(loxone_cfg, credentials)
+                    .await
+                    .map_err(|e| {
+                        loxone_mcp_rust::LoxoneError::connection(format!(
+                            "Failed to create client: {e}"
+                        ))
+                    })?;
+
+                let context = Arc::new(ClientContext::new());
+                let client_arc: Arc<dyn loxone_mcp_rust::client::LoxoneClient> = Arc::new(client);
+                let sensor_registry = Arc::new(SensorTypeRegistry::new());
+                let value_resolver =
+                    Arc::new(loxone_mcp_rust::services::UnifiedValueResolver::new(
+                        client_arc.clone(),
+                        sensor_registry,
+                    ));
+
+                info!("✅ Loxone client connected");
+
+                Ok::<LoxoneMcpServer, loxone_mcp_rust::LoxoneError>(LoxoneMcpServer::with_context(
+                    client_arc,
+                    context,
+                    value_resolver,
+                    None,
+                    LoxoneServerConfig::default(),
+                ))
             }
-            _ => pulseengine_mcp_auth::AuthConfig {
-                enabled: false,
-                ..Default::default()
-            },
         };
 
-        let auth_manager = AuthenticationManager::new(auth_config)
-            .await
-            .map_err(|e| loxone_mcp_rust::LoxoneError::config(e.to_string()))?;
-
-        info!("✅ Framework authentication initialized");
-        Arc::new(auth_manager)
-    };
-
-    // Create Loxone framework backend
-    let backend = create_loxone_backend(loxone_config).await?;
-    info!("✅ Loxone framework backend initialized");
-
-    // Create middleware stack based on transport (without monitoring - dropped in 0.17.0 upgrade)
-    let middleware = match &config.transport {
-        TransportCommand::Stdio { .. } => MiddlewareStack::new(),
-        TransportCommand::Http { api_key, .. } => {
-            let mut stack = MiddlewareStack::new();
-
-            // Add security middleware
-            let security_config = pulseengine_mcp_security::SecurityConfig::default();
-            stack = stack.with_security(SecurityMiddleware::new(security_config));
-
-            // Add auth middleware
-            if let Some(key) = api_key {
-                if key.len() < 32 {
-                    return Err(loxone_mcp_rust::LoxoneError::config(
-                        "API key must be at least 32 characters for security",
-                    ));
-                }
-                info!(
-                    "API key provided for HTTP authentication (key length: {} chars)",
-                    key.len()
-                );
-            }
-            stack = stack.with_auth(framework_auth_manager.clone());
-            info!("Framework authentication middleware added");
-
-            stack
-        }
-        TransportCommand::StreamableHttp { .. } => {
-            let mut stack = MiddlewareStack::new();
-            let security_config = pulseengine_mcp_security::SecurityConfig::default();
-            stack = stack.with_security(SecurityMiddleware::new(security_config));
-            stack
-        }
-    };
-
-    // Create generic handler with middleware
-    let handler = GenericServerHandler::new(backend, framework_auth_manager.clone(), middleware);
-
-    // Create and configure transport
-    let mut transport: Box<dyn Transport> = match &config.transport {
-        TransportCommand::Stdio { .. } => {
-            info!("Starting stdio transport for Claude Desktop");
-            create_transport(pulseengine_mcp_transport::TransportConfig::Stdio)
-                .map_err(|e| loxone_mcp_rust::LoxoneError::connection(e.to_string()))?
-        }
-        TransportCommand::Http {
-            port,
-            enable_sse,
-            enable_cors,
-            ..
-        } => {
-            if *enable_sse {
-                info!("Starting HTTP transport with SSE support on port {}", port);
-            } else {
-                info!("Starting HTTP transport on port {}", port);
-            }
-
-            let http_transport = pulseengine_mcp_transport::http::HttpTransport::new(*port);
-
-            if *enable_cors {
-                info!("CORS enabled for HTTP transport");
-            }
-
-            Box::new(http_transport)
-        }
-        TransportCommand::StreamableHttp { port, enable_cors } => {
-            info!("Starting Streamable HTTP transport on port {}", port);
-
-            if *enable_cors {
-                info!("CORS enabled for Streamable HTTP transport");
-            }
-
-            create_transport(pulseengine_mcp_transport::TransportConfig::StreamableHttp {
-                port: *port,
-                host: None,
-            })
-            .map_err(|e| loxone_mcp_rust::LoxoneError::connection(e.to_string()))?
-        }
-    };
-
-    // Start the transport with the handler
-    transport
-        .start(Box::new(move |req| {
-            let handler = handler.clone();
-            Box::pin(async move {
-                handler.handle_request(req).await.unwrap_or_else(|e| {
-                    tracing::error!("Request handling error: {}", e);
-                    pulseengine_mcp_protocol::Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: None,
-                        result: None,
-                        error: Some(pulseengine_mcp_protocol::Error::internal_error(
-                            e.to_string(),
-                        )),
-                    }
-                })
-            })
-        }))
-        .await
-        .map_err(|e| loxone_mcp_rust::LoxoneError::connection(e.to_string()))?;
-
-    info!("✅ Server started successfully");
-
-    // Handle shutdown based on transport type
     match config.transport {
-        TransportCommand::Stdio { .. } => {
-            info!("Server running. Will exit when stdin closes.");
+        TransportCommand::Stdio { offline } => {
+            LoxoneMcpServer::configure_stdio_logging();
+
+            let server = if offline {
+                info!("🚀 Starting MCP server in offline mode (stdio)");
+                LoxoneMcpServer::with_defaults()
+            } else {
+                info!("🚀 Starting MCP server with Loxone connection (stdio)");
+                build_mcp_server(
+                    &loxone_host,
+                    &loxone_user,
+                    &_loxone_password,
+                    config.insecure,
+                )
+                .await?
+            };
+
+            let mut mcp_server = server.serve_stdio().await.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}"))
+            })?;
+            info!("✅ Server started (stdio)");
+            mcp_server.run().await.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}"))
+            })?;
         }
-        _ => {
-            info!("Server running. Press Ctrl+C to stop.");
-            tokio::signal::ctrl_c()
-                .await
-                .map_err(|e| loxone_mcp_rust::LoxoneError::connection(e.to_string()))?;
-            info!("Shutting down...");
+
+        TransportCommand::Http { port, dev_mode, .. } => {
+            let server = if dev_mode {
+                warn!("Development mode enabled — no auth, localhost only");
+                LoxoneMcpServer::with_defaults()
+            } else {
+                info!(
+                    "🚀 Starting MCP server with Loxone connection (HTTP port {})",
+                    port
+                );
+                build_mcp_server(
+                    &loxone_host,
+                    &loxone_user,
+                    &_loxone_password,
+                    config.insecure,
+                )
+                .await?
+            };
+
+            let serve_result: std::result::Result<
+                pulseengine_mcp_server::McpServer<LoxoneMcpServer>,
+                _,
+            > = server.serve_http(port).await;
+            let mut mcp_server = serve_result.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}"))
+            })?;
+            info!("✅ Server started (HTTP port {})", port);
+            let run_result: std::result::Result<(), _> = mcp_server.run().await;
+            run_result.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}"))
+            })?;
+        }
+
+        TransportCommand::StreamableHttp { port, .. } => {
+            info!(
+                "🚀 Starting MCP server with Loxone connection (Streamable HTTP port {})",
+                port
+            );
+            let server = build_mcp_server(
+                &loxone_host,
+                &loxone_user,
+                &_loxone_password,
+                config.insecure,
+            )
+            .await?;
+
+            let serve_result: std::result::Result<
+                pulseengine_mcp_server::McpServer<LoxoneMcpServer>,
+                _,
+            > = server.serve_http(port).await;
+            let mut mcp_server = serve_result.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Failed to start server: {e}"))
+            })?;
+            info!("✅ Server started (Streamable HTTP port {})", port);
+            let run_result: std::result::Result<(), _> = mcp_server.run().await;
+            run_result.map_err(|e| {
+                loxone_mcp_rust::LoxoneError::connection(format!("Server error: {e}"))
+            })?;
         }
     }
 

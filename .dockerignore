@@ -1,0 +1,17 @@
+target/
+.git/
+.github/
+docs/
+tests/
+examples/
+loxone-mcp-rust/
+*.md
+!README.md
+.gitignore
+.dockerignore
+.env*
+.DS_Store
+.vscode/
+.idea/
+.claude/
+.cursor/

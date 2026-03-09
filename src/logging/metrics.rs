@@ -555,8 +555,8 @@ fn current_timestamp() -> u64 {
 }
 
 /// Global metrics collector instance
-static METRICS: once_cell::sync::Lazy<MetricsCollector> =
-    once_cell::sync::Lazy::new(MetricsCollector::new);
+static METRICS: std::sync::LazyLock<MetricsCollector> =
+    std::sync::LazyLock::new(MetricsCollector::new);
 
 /// Get the global metrics collector
 pub fn get_metrics() -> &'static MetricsCollector {

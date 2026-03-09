@@ -2,6 +2,7 @@
 
 pub mod credential_registry;
 pub mod credentials;
+pub mod master_key;
 
 #[cfg(target_os = "macos")]
 pub mod security_keychain;

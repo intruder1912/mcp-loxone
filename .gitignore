@@ -1,31 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Rust
+target/
+/target/
+*.rs.bk
+*.pdb
 
-# Virtual environments
-venv/
-ENV/
-env/
-.venv
+# Rust generated files
+post-build-sign.sh
+export_env.sh
 
 # IDEs
 .vscode/
@@ -36,6 +17,7 @@ env/
 
 # OS
 .DS_Store
+**/.DS_Store
 Thumbs.db
 
 # Environment variables
@@ -47,18 +29,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# uv
-.uv/
 
 # MCP specific
 mcp_debug/
@@ -76,17 +46,6 @@ secrets.json
 p.md
 .hypothesis/
 
-# Rust
-target/
-/target/
-Cargo.lock
-*.rs.bk
-*.pdb
-
-# Rust generated files
-post-build-sign.sh
-export_env.sh
-
 # Sensor logs (runtime data)
 sensor_state_log.json
 
@@ -103,8 +62,8 @@ TESTING_STRATEGY.md
 # Node.js (for MCP testing)
 node_modules/
 package-lock.json
+
+# Legacy subdirectory artifacts
 loxone-mcp-rust/target/
 loxone-mcp-rust/loxone-mcp/
 loxone-mcp-rust/dont-commit.env
-.DS_Store
-**/.DS_Store

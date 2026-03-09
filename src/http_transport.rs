@@ -231,6 +231,8 @@ struct HealthServices {
 pub struct HttpServerConfig {
     /// Server port
     pub port: u16,
+    /// Bind address (default: "0.0.0.0", dev mode: "127.0.0.1")
+    pub bind_address: String,
     /// Security configuration
     pub security_config: Option<SecurityConfig>,
     /// Performance monitoring configuration
@@ -276,8 +278,15 @@ impl Default for HttpServerConfig {
             Some(EnhancedCorsConfig::production())
         };
 
+        let bind_address = if dev_mode {
+            "127.0.0.1".to_string()
+        } else {
+            "0.0.0.0".to_string()
+        };
+
         Self {
             port: 3001,
+            bind_address,
             security_config,
             performance_config,
             cors_config,
@@ -308,6 +317,8 @@ pub struct HttpTransportServer {
     influx_manager: Option<Arc<InfluxManager>>,
     /// Server port
     port: u16,
+    /// Bind address
+    bind_address: String,
 }
 
 impl HttpTransportServer {
@@ -387,6 +398,7 @@ impl HttpTransportServer {
             #[cfg(feature = "influxdb")]
             influx_manager,
             port: config.port,
+            bind_address: config.bind_address,
         })
     }
 
@@ -472,6 +484,7 @@ impl HttpTransportServer {
             #[cfg(feature = "influxdb")]
             influx_manager,
             port: config.port,
+            bind_address: config.bind_address,
         })
     }
 
@@ -479,10 +492,13 @@ impl HttpTransportServer {
     pub async fn start(&self) -> Result<()> {
         let app = self.create_router().await?;
 
-        let listener = TcpListener::bind(format!("0.0.0.0:{}", self.port))
+        let listener = TcpListener::bind(format!("{}:{}", self.bind_address, self.port))
             .await
             .map_err(|e| {
-                LoxoneError::connection(format!("Failed to bind to port {}: {}", self.port, e))
+                LoxoneError::connection(format!(
+                    "Failed to bind to {}:{}: {}",
+                    self.bind_address, self.port, e
+                ))
             })?;
 
         info!("🌐 HTTP MCP server starting on port {}", self.port);

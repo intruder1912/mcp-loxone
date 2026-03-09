@@ -12,7 +12,7 @@ use aes::{
     cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray},
 };
 use base64::{Engine as _, engine::general_purpose};
-use rand::{RngCore, thread_rng};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -119,7 +119,7 @@ impl EncryptionSession {
     /// Create a new encryption session with random key
     pub fn new(session_duration_hours: u32) -> Self {
         let mut key = [0u8; 32];
-        thread_rng().fill_bytes(&mut key);
+        rand::rng().fill_bytes(&mut key);
 
         let now = chrono::Utc::now();
         let session_id = generate_session_id();
@@ -170,7 +170,7 @@ impl EncryptionSession {
 
         // Generate random IV
         let mut iv = [0u8; 16];
-        thread_rng().fill_bytes(&mut iv);
+        rand::rng().fill_bytes(&mut iv);
 
         // Encrypt the message
         let encrypted_data = encrypt_aes_cbc(&self.key, &iv, plaintext)?;
@@ -347,7 +347,7 @@ pub fn decrypt_aes_cbc(
 /// Generate a secure session ID
 fn generate_session_id() -> String {
     let mut bytes = [0u8; 16];
-    thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }
 

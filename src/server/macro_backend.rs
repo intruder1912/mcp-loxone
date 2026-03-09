@@ -7,13 +7,13 @@
 //! - Parameter validation
 //! - Error handling
 
-use crate::client::{ClientContext, LoxoneClient};
+use crate::client::{ClientContext, LoxoneClient, LoxoneStructure};
 use crate::config::ServerConfig;
 use crate::services::{StateManager, UnifiedValueResolver};
 use pulseengine_mcp_macros::{mcp_server, mcp_tools};
-use serde_json::json;
+use serde_json::{Value, json};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 /// Loxone MCP Server with macro-based tool definitions
 ///
@@ -71,6 +71,124 @@ impl LoxoneMcpServer {
             .as_ref()
             .ok_or_else(|| "Client not initialized".to_string())
     }
+
+    /// Resolve a room name to its UUID by searching the structure's rooms.
+    /// Returns None if no matching room is found.
+    fn resolve_room_uuid(structure: &LoxoneStructure, room_name: &str) -> Option<String> {
+        let lower = room_name.to_lowercase();
+        for (uuid, room) in &structure.rooms {
+            if let Some(name) = room.get("name").and_then(|v| v.as_str())
+                && (name.to_lowercase() == lower || name.to_lowercase().contains(&lower))
+            {
+                return Some(uuid.clone());
+            }
+        }
+        None
+    }
+
+    /// Find controls matching the given types within a specific room (by room UUID).
+    fn find_controls_by_type_in_room<'a>(
+        structure: &'a LoxoneStructure,
+        room_uuid: &str,
+        types: &[&str],
+    ) -> Vec<(&'a String, &'a Value)> {
+        structure
+            .controls
+            .iter()
+            .filter(|(_, control)| {
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let control_room = control.get("room").and_then(|v| v.as_str()).unwrap_or("");
+                types.contains(&control_type) && control_room == room_uuid
+            })
+            .collect()
+    }
+
+    /// Find controls matching the given types across the entire system.
+    fn find_controls_by_type<'a>(
+        structure: &'a LoxoneStructure,
+        types: &[&str],
+    ) -> Vec<(&'a String, &'a Value)> {
+        structure
+            .controls
+            .iter()
+            .filter(|(_, control)| {
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                types.contains(&control_type)
+            })
+            .collect()
+    }
+
+    /// Find a single control by UUID or by name (case-insensitive partial match).
+    /// Returns the (uuid, control) pair.
+    fn find_control_by_id_or_name<'a>(
+        structure: &'a LoxoneStructure,
+        identifier: &str,
+    ) -> Option<(&'a String, &'a Value)> {
+        // Try exact UUID match first
+        if let Some(control) = structure.controls.get(identifier) {
+            return structure
+                .controls
+                .get_key_value(identifier)
+                .map(|(k, _)| (k, control));
+        }
+        // Fall back to name search
+        let lower = identifier.to_lowercase();
+        structure.controls.iter().find(|(_, control)| {
+            control
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|n| n.to_lowercase() == lower || n.to_lowercase().contains(&lower))
+                .unwrap_or(false)
+        })
+    }
+
+    /// Search for climate controllers in a room by room name.
+    fn find_climate_in_room<'a>(
+        structure: &'a LoxoneStructure,
+        room_name: &str,
+        climate_types: &[&str],
+    ) -> std::result::Result<Vec<(&'a String, &'a Value)>, String> {
+        if let Some(room_uuid) = Self::resolve_room_uuid(structure, room_name) {
+            Ok(Self::find_controls_by_type_in_room(
+                structure,
+                &room_uuid,
+                climate_types,
+            ))
+        } else {
+            // If room name didn't resolve, try to find climate controllers whose name contains the room
+            let lower = room_name.to_lowercase();
+            Ok(structure
+                .controls
+                .iter()
+                .filter(|(_, control)| {
+                    let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    let name = control
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    climate_types.contains(&control_type) && name.contains(&lower)
+                })
+                .collect())
+        }
+    }
+
+    /// Fetch live state for a list of UUIDs and return a mapping from UUID to state value.
+    async fn fetch_live_states(
+        client: &Arc<dyn LoxoneClient>,
+        uuids: &[String],
+    ) -> std::collections::HashMap<String, Value> {
+        if uuids.is_empty() {
+            return std::collections::HashMap::new();
+        }
+        match client.get_device_states(uuids).await {
+            Ok(states) => states,
+            Err(e) => {
+                warn!("Failed to fetch live device states: {e}");
+                std::collections::HashMap::new()
+            }
+        }
+    }
 }
 
 /// All MCP tools defined in a single impl block
@@ -115,13 +233,135 @@ impl LoxoneMcpServer {
             return Err("Brightness must be between 0-100".to_string());
         }
 
-        Ok(json!({
-            "scope": scope,
-            "target": target,
-            "action": normalized_action,
-            "brightness": brightness,
-            "status": "executed"
-        }))
+        // Build the Loxone command string from the normalized action + brightness
+        let command = match (normalized_action, brightness) {
+            (_, Some(level)) => format!("{level}"),
+            ("on", None) => "on".to_string(),
+            ("off", None) => "off".to_string(),
+            ("dim", None) => "25".to_string(), // default dim level
+            ("bright", None) => "100".to_string(), // full brightness
+            _ => "on".to_string(),
+        };
+
+        let client = self.get_client()?;
+        let light_types = &["Switch", "Dimmer", "LightController", "ColorPicker"];
+
+        match scope.to_lowercase().as_str() {
+            "device" => {
+                let target_id = target
+                    .as_deref()
+                    .ok_or_else(|| "target is required when scope is 'device'".to_string())?;
+                let response = client
+                    .send_command(target_id, &command)
+                    .await
+                    .map_err(|e| format!("Failed to send command to device {target_id}: {e}"))?;
+                Ok(json!({
+                    "scope": "device",
+                    "target": target_id,
+                    "action": normalized_action,
+                    "brightness": brightness,
+                    "command_sent": command,
+                    "status": "executed",
+                    "miniserver_response": response.value
+                }))
+            }
+            "room" => {
+                let room_name = target.as_deref().ok_or_else(|| {
+                    "target (room name) is required when scope is 'room'".to_string()
+                })?;
+                let structure = client
+                    .get_structure()
+                    .await
+                    .map_err(|e| format!("Failed to get structure: {e}"))?;
+                let room_uuid = Self::resolve_room_uuid(&structure, room_name)
+                    .ok_or_else(|| format!("Room '{room_name}' not found"))?;
+                let controls =
+                    Self::find_controls_by_type_in_room(&structure, &room_uuid, light_types);
+                if controls.is_empty() {
+                    return Err(format!("No lights found in room '{room_name}'"));
+                }
+                let mut results = Vec::new();
+                for (uuid, control) in &controls {
+                    let name = control
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown");
+                    match client.send_command(uuid, &command).await {
+                        Ok(response) => {
+                            results.push(json!({
+                                "uuid": uuid,
+                                "name": name,
+                                "status": "executed",
+                                "miniserver_response": response.value
+                            }));
+                        }
+                        Err(e) => {
+                            results.push(json!({
+                                "uuid": uuid,
+                                "name": name,
+                                "status": "error",
+                                "error": format!("{e}")
+                            }));
+                        }
+                    }
+                }
+                Ok(json!({
+                    "scope": "room",
+                    "target": room_name,
+                    "action": normalized_action,
+                    "brightness": brightness,
+                    "command_sent": command,
+                    "devices_affected": results.len(),
+                    "results": results
+                }))
+            }
+            "system" => {
+                let structure = client
+                    .get_structure()
+                    .await
+                    .map_err(|e| format!("Failed to get structure: {e}"))?;
+                let controls = Self::find_controls_by_type(&structure, light_types);
+                if controls.is_empty() {
+                    return Err("No lights found in the system".to_string());
+                }
+                let mut results = Vec::new();
+                for (uuid, control) in &controls {
+                    let name = control
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown");
+                    match client.send_command(uuid, &command).await {
+                        Ok(response) => {
+                            results.push(json!({
+                                "uuid": uuid,
+                                "name": name,
+                                "status": "executed",
+                                "miniserver_response": response.value
+                            }));
+                        }
+                        Err(e) => {
+                            results.push(json!({
+                                "uuid": uuid,
+                                "name": name,
+                                "status": "error",
+                                "error": format!("{e}")
+                            }));
+                        }
+                    }
+                }
+                Ok(json!({
+                    "scope": "system",
+                    "action": normalized_action,
+                    "brightness": brightness,
+                    "command_sent": command,
+                    "devices_affected": results.len(),
+                    "results": results
+                }))
+            }
+            _ => Err(format!(
+                "Invalid scope '{scope}'. Use: device, room, system"
+            )),
+        }
     }
 
     /// Get the current state of all lights
@@ -137,7 +377,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut lights = Vec::new();
+        let mut light_uuids = Vec::new();
+        let mut light_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -146,6 +387,17 @@ impl LoxoneMcpServer {
                 control_type,
                 "Switch" | "Dimmer" | "LightController" | "ColorPicker"
             ) {
+                light_uuids.push(uuid.clone());
+                light_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        // Fetch live states for all lights
+        let live_states = Self::fetch_live_states(client, &light_uuids).await;
+
+        let lights: Vec<Value> = light_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -154,15 +406,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                lights.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "lights": lights,
@@ -194,11 +449,82 @@ impl LoxoneMcpServer {
             return Err(format!("Invalid mode '{mode}'. Use: heat, cool, auto, off"));
         }
 
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let climate_types = &["IRoomController", "Intelligent Room Controller"];
+
+        // Try to find the thermostat: first by direct UUID/name, then by room
+        let thermostat = Self::find_control_by_id_or_name(&structure, &room);
+        let targets: Vec<(&String, &Value)> = if let Some(target) = thermostat {
+            // Check it's actually a climate controller
+            let control_type = target.1.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if climate_types.contains(&control_type) {
+                vec![target]
+            } else {
+                // Not a climate controller, search by room
+                Self::find_climate_in_room(&structure, &room, climate_types)?
+            }
+        } else {
+            Self::find_climate_in_room(&structure, &room, climate_types)?
+        };
+
+        if targets.is_empty() {
+            return Err(format!("No climate controller found for room '{room}'"));
+        }
+
+        let command = format!("settemp/{temperature}");
+        let mut results = Vec::new();
+        for (uuid, control) in &targets {
+            let name = control
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown");
+            match client.send_command(uuid, &command).await {
+                Ok(response) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "status": "executed",
+                        "miniserver_response": response.value
+                    }));
+                }
+                Err(e) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "status": "error",
+                        "error": format!("{e}")
+                    }));
+                }
+            }
+        }
+
+        // Also send mode command if not "auto" (the default)
+        if mode != "auto" {
+            let mode_command = match mode.as_str() {
+                "heat" => "setmode/1",
+                "cool" => "setmode/2",
+                "off" => "setmode/0",
+                _ => "setmode/3", // auto
+            };
+            for (uuid, _) in &targets {
+                if let Err(e) = client.send_command(uuid, mode_command).await {
+                    warn!("Failed to set mode on {uuid}: {e}");
+                }
+            }
+        }
+
         Ok(json!({
             "room": room,
             "target_temperature": temperature,
             "mode": mode,
-            "status": "success"
+            "command_sent": command,
+            "controllers_affected": results.len(),
+            "results": results
         }))
     }
 
@@ -212,7 +538,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut climate_data = Vec::new();
+        let mut climate_uuids = Vec::new();
+        let mut climate_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -221,6 +548,16 @@ impl LoxoneMcpServer {
                 control_type,
                 "IRoomController" | "Intelligent Room Controller"
             ) {
+                climate_uuids.push(uuid.clone());
+                climate_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &climate_uuids).await;
+
+        let climate_data: Vec<Value> = climate_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -229,14 +566,16 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                climate_data.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "climate_controllers": climate_data,
@@ -265,7 +604,7 @@ impl LoxoneMcpServer {
                 return Err("Position must be between 0-100".to_string());
             }
             format!("ManualPosition/{pos}")
-        } else if let Some(act) = action {
+        } else if let Some(ref act) = action {
             match act.to_lowercase().as_str() {
                 "up" | "open" | "auf" => "FullUp".to_string(),
                 "down" | "close" | "ab" | "zu" => "FullDown".to_string(),
@@ -281,10 +620,21 @@ impl LoxoneMcpServer {
             return Err("Either action or position must be provided".to_string());
         };
 
+        let client = self.get_client()?;
+
+        // Target can be a UUID or a device name; send command directly
+        let response = client
+            .send_command(&target, &command)
+            .await
+            .map_err(|e| format!("Failed to send blinds command to {target}: {e}"))?;
+
         Ok(json!({
             "target": target,
-            "command": command,
-            "status": "success"
+            "action": action,
+            "position": position,
+            "command_sent": command,
+            "status": "executed",
+            "miniserver_response": response.value
         }))
     }
 
@@ -298,12 +648,23 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut blinds = Vec::new();
+        let mut blind_uuids = Vec::new();
+        let mut blind_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "Jalousie" | "Blinds" | "Rolladen") {
+                blind_uuids.push(uuid.clone());
+                blind_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &blind_uuids).await;
+
+        let blinds: Vec<Value> = blind_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -312,14 +673,16 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                blinds.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "blinds": blinds,
@@ -480,10 +843,31 @@ impl LoxoneMcpServer {
             }
         };
 
+        let client = self.get_client()?;
+
+        // Map normalized actions to Loxone audio commands
+        let command = match normalized_action {
+            "play" => "play",
+            "pause" => "pause",
+            "stop" => "stop",
+            "next" => "queueplus",
+            "previous" => "queueminus",
+            "mute" => "mute",
+            "unmute" => "unmute",
+            _ => normalized_action,
+        };
+
+        let response = client
+            .send_command(&zone, command)
+            .await
+            .map_err(|e| format!("Failed to control audio zone {zone}: {e}"))?;
+
         Ok(json!({
             "zone": zone,
             "action": normalized_action,
-            "status": "executed"
+            "command_sent": command,
+            "status": "executed",
+            "miniserver_response": response.value
         }))
     }
 
@@ -501,10 +885,19 @@ impl LoxoneMcpServer {
             return Err("Volume must be between 0-100".to_string());
         }
 
+        let client = self.get_client()?;
+        let command = format!("volume/{volume}");
+        let response = client
+            .send_command(&zone, &command)
+            .await
+            .map_err(|e| format!("Failed to set volume on zone {zone}: {e}"))?;
+
         Ok(json!({
             "zone": zone,
             "volume": volume,
-            "status": "success"
+            "command_sent": command,
+            "status": "executed",
+            "miniserver_response": response.value
         }))
     }
 
@@ -518,12 +911,23 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut audio_zones = Vec::new();
+        let mut audio_uuids = Vec::new();
+        let mut audio_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if control_type.contains("Audio") || control_type == "MediaController" {
+                audio_uuids.push(uuid.clone());
+                audio_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &audio_uuids).await;
+
+        let audio_zones: Vec<Value> = audio_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -532,15 +936,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                audio_zones.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "audio_zones": audio_zones,
@@ -564,7 +971,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut sensors = Vec::new();
+        let mut sensor_uuids = Vec::new();
+        let mut sensor_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -580,6 +988,16 @@ impl LoxoneMcpServer {
                     | "Meter"
                     | "Sensor"
             ) {
+                sensor_uuids.push(uuid.clone());
+                sensor_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &sensor_uuids).await;
+
+        let sensors: Vec<Value> = sensor_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -588,15 +1006,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                sensors.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "value": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "sensors": sensors,
@@ -616,7 +1037,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut door_windows = Vec::new();
+        let mut dw_uuids = Vec::new();
+        let mut dw_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -633,18 +1055,34 @@ impl LoxoneMcpServer {
                     || name.contains("tür")
                     || name.contains("fenster"))
             {
+                dw_uuids.push(uuid.clone());
+                dw_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &dw_uuids).await;
+
+        let door_windows: Vec<Value> = dw_info
+            .iter()
+            .map(|(uuid, control)| {
+                let display_name = control
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
                 let room = control
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                door_windows.push(json!({
+                json!({
                     "uuid": uuid,
-                    "name": control.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown"),
-                    "room": room
-                }));
-            }
-        }
+                    "name": display_name,
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "door_window_sensors": door_windows,
@@ -662,12 +1100,23 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut motion_sensors = Vec::new();
+        let mut motion_uuids = Vec::new();
+        let mut motion_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if matches!(control_type, "PresenceDetector" | "MotionSensor") {
+                motion_uuids.push(uuid.clone());
+                motion_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &motion_uuids).await;
+
+        let motion_sensors: Vec<Value> = motion_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -676,14 +1125,16 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                motion_sensors.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "motion_sensors": motion_sensors,
@@ -707,24 +1158,38 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut weather_devices = Vec::new();
+        let mut weather_uuids = Vec::new();
+        let mut weather_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             if control_type.contains("Weather") {
+                weather_uuids.push(uuid.clone());
+                weather_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &weather_uuids).await;
+
+        let weather_devices: Vec<Value> = weather_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                weather_devices.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
-                    "type": control_type
-                }));
-            }
-        }
+                    "type": control_type,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "weather_devices": weather_devices,
@@ -748,7 +1213,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut energy_devices = Vec::new();
+        let mut energy_uuids = Vec::new();
+        let mut energy_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -756,6 +1222,16 @@ impl LoxoneMcpServer {
             if matches!(control_type, "Meter" | "EnergyManager" | "EnergyMonitor")
                 || control_type.contains("Energy")
             {
+                energy_uuids.push(uuid.clone());
+                energy_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &energy_uuids).await;
+
+        let energy_devices: Vec<Value> = energy_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -764,15 +1240,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                energy_devices.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "energy_devices": energy_devices,
@@ -802,11 +1281,43 @@ impl LoxoneMcpServer {
             }
         };
 
+        let client = self.get_client()?;
+
+        // Map actions to Loxone commands
+        let command = match normalized_action {
+            "start" => "on".to_string(),
+            "stop" => "off".to_string(),
+            "pause" => "off".to_string(),
+            _ => "off".to_string(),
+        };
+
+        let response = client
+            .send_command(&charger, &command)
+            .await
+            .map_err(|e| format!("Failed to control EV charger {charger}: {e}"))?;
+
+        // If a limit was specified, try to send it as well
+        let limit_response = if let Some(limit) = limit_kwh {
+            let limit_cmd = format!("setlimit/{limit}");
+            match client.send_command(&charger, &limit_cmd).await {
+                Ok(resp) => Some(resp.value),
+                Err(e) => {
+                    warn!("Failed to set charging limit on {charger}: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(json!({
             "charger": charger,
             "action": normalized_action,
+            "command_sent": command,
             "limit_kwh": limit_kwh,
-            "status": "executed"
+            "status": "executed",
+            "miniserver_response": response.value,
+            "limit_response": limit_response
         }))
     }
 
@@ -826,7 +1337,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut security_devices = Vec::new();
+        let mut security_uuids = Vec::new();
+        let mut security_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -836,6 +1348,16 @@ impl LoxoneMcpServer {
                 "Alarm" | "SmokeAlarm" | "Gate" | "DoorLock" | "AccessControl"
             ) || control_type.contains("Security")
             {
+                security_uuids.push(uuid.clone());
+                security_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &security_uuids).await;
+
+        let security_devices: Vec<Value> = security_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -844,15 +1366,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                security_devices.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "security_devices": security_devices,
@@ -881,10 +1406,70 @@ impl LoxoneMcpServer {
             }
         };
 
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        // Find alarm/security controls
+        let security_controls: Vec<(&String, &Value)> = structure
+            .controls
+            .iter()
+            .filter(|(_, control)| {
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                matches!(control_type, "Alarm" | "AccessControl")
+                    || control_type.contains("Security")
+            })
+            .collect();
+
+        if security_controls.is_empty() {
+            return Err("No security/alarm devices found in the system".to_string());
+        }
+
+        // Build command - include code if provided
+        let command = match (normalized_mode, &code) {
+            ("arm_away", Some(c)) => format!("on/{c}"),
+            ("arm_away", None) => "on".to_string(),
+            ("arm_home", Some(c)) => format!("on/{c}"),
+            ("arm_home", None) => "on".to_string(),
+            ("disarm", Some(c)) => format!("off/{c}"),
+            ("disarm", None) => "off".to_string(),
+            _ => "off".to_string(),
+        };
+
+        let mut results = Vec::new();
+        for (uuid, control) in &security_controls {
+            let name = control
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown");
+            match client.send_command(uuid, &command).await {
+                Ok(response) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "status": "executed",
+                        "miniserver_response": response.value
+                    }));
+                }
+                Err(e) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "status": "error",
+                        "error": format!("{e}")
+                    }));
+                }
+            }
+        }
+
         Ok(json!({
             "mode": normalized_mode,
             "code_provided": code.is_some(),
-            "status": "executed"
+            "command_sent": command,
+            "devices_affected": results.len(),
+            "results": results
         }))
     }
 
@@ -904,10 +1489,24 @@ impl LoxoneMcpServer {
             _ => return Err(format!("Invalid action '{action}'. Use: lock, unlock")),
         };
 
+        let client = self.get_client()?;
+        let command = match normalized_action {
+            "lock" => "on",
+            "unlock" => "off",
+            _ => "off",
+        };
+
+        let response = client
+            .send_command(&lock, command)
+            .await
+            .map_err(|e| format!("Failed to control door lock {lock}: {e}"))?;
+
         Ok(json!({
             "lock": lock,
             "action": normalized_action,
-            "status": "executed"
+            "command_sent": command,
+            "status": "executed",
+            "miniserver_response": response.value
         }))
     }
 
@@ -927,7 +1526,8 @@ impl LoxoneMcpServer {
             .await
             .map_err(|e| format!("Failed to get structure: {e}"))?;
 
-        let mut cameras = Vec::new();
+        let mut camera_uuids = Vec::new();
+        let mut camera_info = Vec::new();
 
         for (uuid, control) in &structure.controls {
             let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -935,6 +1535,16 @@ impl LoxoneMcpServer {
             if matches!(control_type, "Intercom" | "Camera" | "Doorbell")
                 || control_type.contains("Camera")
             {
+                camera_uuids.push(uuid.clone());
+                camera_info.push((uuid.clone(), control.clone()));
+            }
+        }
+
+        let live_states = Self::fetch_live_states(client, &camera_uuids).await;
+
+        let cameras: Vec<Value> = camera_info
+            .iter()
+            .map(|(uuid, control)| {
                 let name = control
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -943,15 +1553,18 @@ impl LoxoneMcpServer {
                     .get("room")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
+                let control_type = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let state = live_states.get(uuid).cloned().unwrap_or(Value::Null);
 
-                cameras.push(json!({
+                json!({
                     "uuid": uuid,
                     "name": name,
                     "type": control_type,
-                    "room": room
-                }));
-            }
-        }
+                    "room": room,
+                    "state": state
+                })
+            })
+            .collect();
 
         Ok(json!({
             "cameras": cameras,
@@ -986,10 +1599,29 @@ impl LoxoneMcpServer {
             }
         };
 
+        let client = self.get_client()?;
+
+        // Map intercom actions to Loxone commands
+        let command = match normalized_action {
+            "answer" => "answer",
+            "hangup" => "hangup",
+            "open_door" => "open",
+            "talk" => "talk",
+            "mute" => "mute",
+            _ => normalized_action,
+        };
+
+        let response = client
+            .send_command(&intercom, command)
+            .await
+            .map_err(|e| format!("Failed to control intercom {intercom}: {e}"))?;
+
         Ok(json!({
             "intercom": intercom,
             "action": normalized_action,
-            "status": "executed"
+            "command_sent": command,
+            "status": "executed",
+            "miniserver_response": response.value
         }))
     }
 
@@ -1017,10 +1649,125 @@ impl LoxoneMcpServer {
     ) -> std::result::Result<serde_json::Value, String> {
         self.ensure_connected()?;
 
+        let client = self.get_client()?;
+        let structure = client
+            .get_structure()
+            .await
+            .map_err(|e| format!("Failed to get structure: {e}"))?;
+
+        let scene_types = &["LightController", "MoodSwitch"];
+
+        // If scene looks like a UUID, send command directly
+        if scene.contains('-') && scene.len() > 30 {
+            let command = format!("changeTo/{scene}");
+            let response = client
+                .send_command(&scene, "on")
+                .await
+                .map_err(|e| format!("Failed to activate scene {scene}: {e}"))?;
+            return Ok(json!({
+                "scene": scene,
+                "room": room,
+                "command_sent": command,
+                "status": "activated",
+                "miniserver_response": response.value
+            }));
+        }
+
+        // Search for matching scene controllers
+        let controllers: Vec<(&String, &Value)> = if let Some(ref room_name) = room {
+            if let Some(room_uuid) = Self::resolve_room_uuid(&structure, room_name) {
+                Self::find_controls_by_type_in_room(&structure, &room_uuid, scene_types)
+            } else {
+                // Try matching by name
+                structure
+                    .controls
+                    .iter()
+                    .filter(|(_, control)| {
+                        let ct = control.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        let name = control
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_lowercase();
+                        scene_types.contains(&ct) && name.contains(&room_name.to_lowercase())
+                    })
+                    .collect()
+            }
+        } else {
+            Self::find_controls_by_type(&structure, scene_types)
+        };
+
+        if controllers.is_empty() {
+            return Err(format!(
+                "No scene controllers found{}",
+                room.as_ref()
+                    .map(|r| format!(" in room '{r}'"))
+                    .unwrap_or_default()
+            ));
+        }
+
+        // Try to match the scene name to a mood ID, or use the scene value directly
+        let scene_lower = scene.to_lowercase();
+        let mut results = Vec::new();
+        for (uuid, control) in &controllers {
+            let name = control
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown");
+
+            // Check if there are moods defined that match the scene name
+            let mood_id = if let Some(moods) = control.get("moods") {
+                if let Some(moods_obj) = moods.as_object() {
+                    moods_obj
+                        .iter()
+                        .find(|(_, v)| {
+                            v.as_str()
+                                .map(|s| s.to_lowercase().contains(&scene_lower))
+                                .unwrap_or(false)
+                        })
+                        .map(|(id, _)| id.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let command = if let Some(ref id) = mood_id {
+                format!("changeTo/{id}")
+            } else {
+                // Try the scene string as a direct command (could be a mood number)
+                format!("changeTo/{scene}")
+            };
+
+            match client.send_command(uuid, &command).await {
+                Ok(response) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "command_sent": command,
+                        "mood_id": mood_id,
+                        "status": "activated",
+                        "miniserver_response": response.value
+                    }));
+                }
+                Err(e) => {
+                    results.push(json!({
+                        "uuid": uuid,
+                        "name": name,
+                        "command_sent": command,
+                        "status": "error",
+                        "error": format!("{e}")
+                    }));
+                }
+            }
+        }
+
         Ok(json!({
             "scene": scene,
             "room": room,
-            "status": "activated"
+            "controllers_affected": results.len(),
+            "results": results
         }))
     }
 

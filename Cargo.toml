@@ -11,15 +11,15 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 # Core dependencies
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.50", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-trait = "0.1"
-uuid = { version = "1.11", features = ["v4", "serde"] }
+uuid = { version = "1.22", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Validation
 validator = { version = "0.20", features = ["derive"] }
@@ -28,12 +28,12 @@ validator = { version = "0.20", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # System
-dirs = "5.0"
+dirs = "6.0"
 
 # Crypto
 sha2 = "0.10"
 base64 = "0.22"
-rand = "0.8"
+rand = "0.9"
 aes = "0.8"
 cbc = "0.1"
 pbkdf2 = "0.12"
@@ -41,18 +41,18 @@ hex = "0.4"
 
 
 # CLI dependencies
-clap = { version = "4.0", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 toml = "0.8"
-url = "2.4"
+url = "2.5"
 
-# HTTP/Web 
+# HTTP/Web
 axum = { version = "0.7", features = ["ws"] }
-tower = { version = "0.4" }
-tower-http = { version = "0.5", features = ["cors", "auth"] }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", features = ["cors", "auth"] }
 hyper = { version = "1.4", features = ["full"] }
 
 # WebSocket
-tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 tungstenite = { version = "0.24" }
 
 # Async utilities
@@ -101,14 +101,14 @@ path = "src/bin/setup.rs"
 name = "loxone-mcp-auth"
 path = "src/bin/loxone-mcp-auth.rs"
 
+[[bin]]
+name = "loxone-cli"
+path = "src/bin/loxone-cli.rs"
 
 # Development utilities
 [[bin]]
 name = "loxone-mcp-test-endpoints"
 path = "src/bin/test_endpoints.rs"
-
-
-
 
 [dependencies]
 # MCP Framework (from crates.io) - Upgraded to 0.17.0 with macros support
@@ -122,26 +122,22 @@ pulseengine-mcp-security = { version = "0.17.0", optional = true }
 # Macros crate for simplified tool/resource definitions
 pulseengine-mcp-macros = { version = "0.17.0", optional = true }
 
-# Legacy MCP Foundation (to be removed after migration)
-# Legacy mcp-foundation removed - framework is now default
-
 # Async runtime
-tokio = { version = "1.0", features = ["rt-multi-thread", "rt", "io-util", "sync", "macros", "time", "fs"] }
-
+tokio = { version = "1.50", features = ["rt-multi-thread", "rt", "io-util", "sync", "macros", "time", "fs"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# HTTP client with WASM support
-reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Infisical SDK support (via HTTP API)
-serde_qs = "0.12"
+serde_qs = "0.13"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter", "std", "fmt", "json"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "std", "fmt", "json"] }
 tracing-appender = "0.2"
 
 # Async traits
@@ -149,10 +145,10 @@ async-trait = "0.1"
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # UUID support
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.22", features = ["v4", "serde"] }
 
 # Hex encoding for request IDs
 hex = "0.4"
@@ -165,21 +161,21 @@ influxdb2 = { version = "0.5", optional = true }
 influxdb2-derive = { version = "0.1", optional = true }
 
 # Configuration
-config = "0.14"
+config = "0.15"
 
 # Crypto dependencies (OpenSSL only)
-openssl = { version = "0.10", features = ["vendored"], optional = true } # Modern RSA implementation (recommended)
+openssl = { version = "0.10", features = ["vendored"], optional = true }
 aes = { version = "0.8", optional = true }
-rand = { version = "0.8" }  # Used by crypto feature and setup tool
+rand = { version = "0.9" }
 sha2 = "0.10"
-x509-parser = { version = "0.15", optional = true }
+x509-parser = { version = "0.16", optional = true }
 hostname = "0.4"
 
 # WebSocket (conditional for WASM compatibility)
-tokio-tungstenite = { version = "0.20", optional = true, features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.24", optional = true, features = ["rustls-tls-webpki-roots"] }
 
 # URL parsing
-url = { version = "2.4", features = ["serde"] }
+url = { version = "2.5", features = ["serde"] }
 urlencoding = "2.1"
 md5 = "0.7"
 
@@ -187,7 +183,7 @@ md5 = "0.7"
 backtrace = "0.3"
 
 # Base64 encoding
-base64 = "0.21"
+base64 = "0.22"
 
 # Futures utilities
 futures = "0.3"
@@ -198,10 +194,7 @@ async-stream = "0.3"
 tokio-util = "0.7"
 
 # Regular expressions for input validation
-regex = "1.10"
-
-# Static initializer for global metrics
-once_cell = "1.19"
+regex = "1.12"
 
 # Time serialization
 humantime-serde = "1.1"
@@ -210,30 +203,29 @@ humantime-serde = "1.1"
 schemars = "0.8"
 
 # System information for resource monitoring
-sysinfo = "0.30"
+sysinfo = "0.33"
 
 # HTTP server for MCP SSE transport (native only)
 axum = { version = "0.7", features = ["ws"], optional = true }
-tower = { version = "0.4", optional = true }
-tower-http = { version = "0.5", features = ["cors", "auth"], optional = true }
+tower = { version = "0.5", optional = true }
+tower-http = { version = "0.6", features = ["cors", "auth"], optional = true }
 
 # Command line argument parsing
-clap = { version = "4.0", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 
 # Password input
 rpassword = "7.0"
 
 # Network discovery
-# mdns = { version = "3.0", optional = true } # Uses unmaintained net2 and proc-macro-error
-mdns-sd = { version = "0.13", optional = true } # Modern mDNS implementation with maintained dependencies
+mdns-sd = { version = "0.13", optional = true }
 
 # Compression for cold storage
-flate2 = "1.0"
+flate2 = "1.1"
 zstd = "0.13"
-lz4 = "1.24"
+lz4 = "1.28"
 
 # Time-series data handling
-tempfile = { version = "3.8" }
+tempfile = { version = "3.26" }
 toml = "0.8.23"
 
 # Turso database support
@@ -241,9 +233,8 @@ libsql = { version = "0.9", optional = true }
 sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "json"], optional = true }
 
 # Additional native dependencies
-# keyring = { version = "2.0", optional = true } # Uses unmaintained dependencies (derivative, instant)
 socket2 = { version = "0.5", optional = true }
-dirs = "5.0"  # For default storage directory
+dirs = "6.0"
 
 [features]
 default = ["crypto-openssl", "websocket", "infisical", "discovery", "http-server", "influxdb", "framework-migration", "turso"]
@@ -261,20 +252,18 @@ framework-migration = [
 ]
 
 # Crypto features
-crypto-openssl = ["openssl", "aes", "x509-parser"] # Modern crypto with OpenSSL (recommended)
+crypto-openssl = ["openssl", "aes", "x509-parser"]
 websocket = ["tokio-tungstenite"]
 infisical = []
-discovery = ["socket2", "mdns-sd"] # Network discovery with modern mDNS implementation
-mdns = ["mdns-sd"] # Feature gate for mDNS functionality (restored with mdns-sd crate)
+discovery = ["socket2", "mdns-sd"]
+mdns = ["mdns-sd"]
 http-server = ["axum", "tower", "tower-http"]
 influxdb = ["influxdb2", "influxdb2-derive"]
-turso = ["libsql", "sqlx"]  # Turso database support for weather data storage
-wasm = []  # Feature flag for WASM compilation
-test-utils = []  # Enables mock utilities for integration tests
-
+turso = ["libsql", "sqlx"]
+wasm = []
+test-utils = []
 
 [profile.release]
-# Optimize for size when building WASM
 opt-level = "s"
 lto = true
 codegen-units = 1
@@ -283,42 +272,41 @@ panic = "abort"
 [profile.release.package."*"]
 opt-level = "s"
 
-# Development profile for faster builds
 [profile.dev]
 opt-level = 0
 debug = true
 incremental = true
 
-
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.8"
+tempfile = "3.26"
 futures = "0.3"
 
-# Modern testing infrastructure (2025)
 # Async test isolation
-serial_test = "3.0"          # Sequential test execution for shared state
-temp-env = "0.3"             # Environment variable isolation
+serial_test = "3.4"
+temp-env = "0.3"
 
 # HTTP API mocking
-wiremock = "0.6"             # HTTP mocking for Loxone API
-httpmock = "0.7"             # Alternative HTTP mock server
+wiremock = "0.6"
+httpmock = "0.7"
 
 # General mocking
-mockall = "0.12"             # Trait mocking for dependencies
+mockall = "0.13"
 
 # Containers & external services
-testcontainers = { version = "0.15", features = ["experimental"] }      # Container-based testing
-testcontainers-modules = "0.3" # Pre-built container modules
+testcontainers = "0.23"
+testcontainers-modules = "0.11"
 
 # Test utilities
-rstest = "0.18"              # Test fixtures & parameterized tests
-serde_json = "1.0"           # JSON handling in tests (likely already available but explicit for tests)
-pretty_assertions = "1.4"    # Better assertion output
+rstest = "0.23"
+serde_json = "1.0"
+pretty_assertions = "1.4"
 
 # Enable test-utils feature for integration tests
 [[test]]
 name = "loxone_stats_tests"
 required-features = ["test-utils"]
 
-
+[[test]]
+name = "live_miniserver_tests"
+required-features = ["test-utils"]
