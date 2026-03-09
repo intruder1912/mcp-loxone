@@ -302,3 +302,7 @@ pretty_assertions = "1.4"
 [[test]]
 name = "loxone_stats_tests"
 required-features = ["test-utils"]
+
+[[test]]
+name = "live_miniserver_tests"
+required-features = ["test-utils"]

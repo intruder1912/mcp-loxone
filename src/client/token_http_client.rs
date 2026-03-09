@@ -23,6 +23,29 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
+/// Validate a Loxone UUID format.
+///
+/// Loxone UUIDs typically follow the pattern `XXXXXXXX-XXXX-XXXX-XXXX` (hex chars with dashes),
+/// but some state UUIDs or sub-control UUIDs may have different segment counts.
+/// This function ensures the UUID:
+/// - Is not empty and not unreasonably long (max 50 chars)
+/// - Contains only hex digits and dashes
+/// - Does not contain path traversal sequences or other dangerous characters
+fn is_valid_loxone_uuid(uuid: &str) -> bool {
+    // Empty or excessively long UUIDs are invalid
+    if uuid.is_empty() || uuid.len() > 50 {
+        return false;
+    }
+
+    // Must not contain path traversal or injection characters
+    if uuid.contains("..") || uuid.contains('/') || uuid.contains('\\') || uuid.contains('%') {
+        return false;
+    }
+
+    // All characters must be hex digits or dashes
+    uuid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+}
+
 /// HTTP client for Loxone Miniserver with token-based authentication
 pub struct TokenHttpClient {
     /// HTTP client instance
@@ -520,6 +543,13 @@ impl LoxoneClient for TokenHttpClient {
     }
 
     async fn send_command(&self, uuid: &str, command: &str) -> Result<LoxoneResponse> {
+        // Validate UUID format to prevent path traversal and injection attacks
+        if !is_valid_loxone_uuid(uuid) {
+            return Err(LoxoneError::validation(format!(
+                "Invalid Loxone UUID format: {uuid}"
+            )));
+        }
+
         // If not connected and command queue is enabled, queue the command
         if !self.connected {
             if let Some(queue) = &self.command_queue {
@@ -960,6 +990,13 @@ impl TokenHttpClient {
         uuid: &str,
         command: &str,
     ) -> Result<LoxoneResponse> {
+        // Validate UUID format to prevent path traversal and injection attacks
+        if !is_valid_loxone_uuid(uuid) {
+            return Err(LoxoneError::validation(format!(
+                "Invalid Loxone UUID format: {uuid}"
+            )));
+        }
+
         let url = self.build_url(&format!("jdev/sps/io/{uuid}/{command}"))?;
 
         let response = self.execute_request(url).await?;

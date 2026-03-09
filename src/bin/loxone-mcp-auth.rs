@@ -140,6 +140,11 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    // Ensure the PulseEngine master encryption key is available (issue #23).
+    if let Err(e) = loxone_mcp_rust::config::master_key::ensure_master_key() {
+        tracing::warn!("Failed to ensure master encryption key: {e}");
+    }
+
     // Load credential registry
     let mut registry = CredentialRegistry::load()?;
 

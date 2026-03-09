@@ -98,6 +98,11 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    // Ensure the PulseEngine master encryption key is available (issue #23).
+    if let Err(e) = loxone_mcp_rust::config::master_key::ensure_master_key() {
+        tracing::warn!("Failed to ensure master encryption key: {e}");
+    }
+
     println!("\n🔐 Loxone MCP Rust Server Setup");
     println!("========================================");
 

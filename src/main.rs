@@ -27,7 +27,7 @@ use loxone_mcp_rust::{
 
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Loxone MCP Server Configuration
@@ -59,6 +59,10 @@ struct Config {
     /// Credential ID (from loxone-mcp-auth)
     #[arg(long, global = true)]
     credential_id: Option<String>,
+
+    /// Disable SSL certificate verification (not recommended for production)
+    #[arg(long, global = true)]
+    insecure: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -230,6 +234,20 @@ async fn main() -> Result<()> {
     // Validate configuration
     config.validate()?;
 
+    if config.insecure {
+        warn!(
+            "SSL certificate verification is DISABLED (--insecure). This is not recommended for production use."
+        );
+    }
+
+    // Ensure the PulseEngine master encryption key is available.
+    // This prevents the "aead::Error" on restart (issue #23).
+    if let Err(e) = loxone_mcp_rust::config::master_key::ensure_master_key() {
+        tracing::warn!(
+            "Failed to ensure master encryption key (falling back to framework default): {e}"
+        );
+    }
+
     info!(
         "🚀 Starting Loxone MCP Server v{}",
         env!("CARGO_PKG_VERSION")
@@ -294,7 +312,7 @@ async fn main() -> Result<()> {
             let loxone_cfg = loxone_mcp_rust::config::LoxoneConfig {
                 url: loxone_url,
                 timeout: std::time::Duration::from_secs(30),
-                verify_ssl: false,
+                verify_ssl: !config.insecure,
                 ..Default::default()
             };
 
@@ -364,7 +382,7 @@ async fn main() -> Result<()> {
                     })?;
                 server_config.loxone.username = loxone_user.clone();
                 server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                server_config.loxone.verify_ssl = false;
+                server_config.loxone.verify_ssl = !config.insecure;
                 server_config
             }
         }
@@ -380,7 +398,7 @@ async fn main() -> Result<()> {
                     })?;
                 server_config.loxone.username = loxone_user.clone();
                 server_config.loxone.timeout = std::time::Duration::from_secs(30);
-                server_config.loxone.verify_ssl = false;
+                server_config.loxone.verify_ssl = !config.insecure;
                 server_config
             }
         }
@@ -391,7 +409,7 @@ async fn main() -> Result<()> {
                 .map_err(|e| loxone_mcp_rust::LoxoneError::config(format!("Invalid URL: {e}")))?;
             server_config.loxone.username = loxone_user.clone();
             server_config.loxone.timeout = std::time::Duration::from_secs(30);
-            server_config.loxone.verify_ssl = false;
+            server_config.loxone.verify_ssl = !config.insecure;
             server_config
         }
     };
@@ -472,19 +490,35 @@ async fn main() -> Result<()> {
             port,
             enable_sse,
             enable_cors,
+            dev_mode,
             ..
         } => {
+            if *dev_mode {
+                warn!(
+                    "Development mode is enabled. HTTP transport will bind to 127.0.0.1 (localhost only)."
+                );
+            }
+
             if *enable_sse {
                 info!("Starting HTTP transport with SSE support on port {}", port);
             } else {
                 info!("Starting HTTP transport on port {}", port);
             }
 
-            let http_transport = pulseengine_mcp_transport::http::HttpTransport::new(*port);
+            let bind_host = if *dev_mode {
+                "127.0.0.1" // Dev mode: localhost only for security
+            } else {
+                "0.0.0.0" // Production: accept external connections
+            };
 
-            if *enable_cors {
-                info!("CORS enabled for HTTP transport");
-            }
+            let http_config = pulseengine_mcp_transport::http::HttpConfig {
+                port: *port,
+                host: bind_host.to_string(),
+                enable_cors: *enable_cors,
+                ..Default::default()
+            };
+            let http_transport =
+                pulseengine_mcp_transport::http::HttpTransport::with_config(http_config);
 
             Box::new(http_transport)
         }

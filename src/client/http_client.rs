@@ -19,6 +19,29 @@ use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
+/// Validate a Loxone UUID format.
+///
+/// Loxone UUIDs typically follow the pattern `XXXXXXXX-XXXX-XXXX-XXXX` (hex chars with dashes),
+/// but some state UUIDs or sub-control UUIDs may have different segment counts.
+/// This function ensures the UUID:
+/// - Is not empty and not unreasonably long (max 50 chars)
+/// - Contains only hex digits and dashes
+/// - Does not contain path traversal sequences or other dangerous characters
+fn is_valid_loxone_uuid(uuid: &str) -> bool {
+    // Empty or excessively long UUIDs are invalid
+    if uuid.is_empty() || uuid.len() > 50 {
+        return false;
+    }
+
+    // Must not contain path traversal or injection characters
+    if uuid.contains("..") || uuid.contains('/') || uuid.contains('\\') || uuid.contains('%') {
+        return false;
+    }
+
+    // All characters must be hex digits or dashes
+    uuid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+}
+
 /// HTTP client for Loxone Miniserver
 pub struct LoxoneHttpClient {
     /// HTTP client instance
@@ -251,6 +274,13 @@ impl LoxoneClient for LoxoneHttpClient {
     async fn send_command(&self, uuid: &str, command: &str) -> Result<LoxoneResponse> {
         if !self.connected {
             return Err(LoxoneError::connection("Not connected to Miniserver"));
+        }
+
+        // Validate UUID format to prevent path traversal and injection attacks
+        if !is_valid_loxone_uuid(uuid) {
+            return Err(LoxoneError::validation(format!(
+                "Invalid Loxone UUID format: {uuid}"
+            )));
         }
 
         debug!("Sending command '{command}' to device {uuid}");
@@ -657,5 +687,42 @@ impl LoxoneHttpClient {
         self.context.update_structure(structure).await?;
         info!("Structure cache refreshed with streaming parser");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_loxone_uuids() {
+        // Standard Loxone UUID format: XXXXXXXX-XXXXXX-XXX
+        assert!(is_valid_loxone_uuid("0F3A4B5C-ABCDEF-012"));
+        assert!(is_valid_loxone_uuid("12345678-ABCDEF-123"));
+        // Standard UUID format (also valid hex+dashes)
+        assert!(is_valid_loxone_uuid("550e8400-e29b-41d4-a716-446655440000"));
+        // Short hex string
+        assert!(is_valid_loxone_uuid("ABCDEF01"));
+        // Hex with dashes
+        assert!(is_valid_loxone_uuid("0-1-2-3"));
+    }
+
+    #[test]
+    fn test_invalid_loxone_uuids() {
+        // Empty
+        assert!(!is_valid_loxone_uuid(""));
+        // Too long
+        assert!(!is_valid_loxone_uuid(&"A".repeat(51)));
+        // Path traversal
+        assert!(!is_valid_loxone_uuid("../../../etc/passwd"));
+        assert!(!is_valid_loxone_uuid("..%2F..%2Fetc%2Fpasswd"));
+        assert!(!is_valid_loxone_uuid("foo/bar"));
+        assert!(!is_valid_loxone_uuid("foo\\bar"));
+        // Percent encoding
+        assert!(!is_valid_loxone_uuid("12345678%00ABCDEF"));
+        // Non-hex characters
+        assert!(!is_valid_loxone_uuid("not-a-valid-uuid!"));
+        assert!(!is_valid_loxone_uuid("hello world"));
+        assert!(!is_valid_loxone_uuid("<script>alert(1)</script>"));
     }
 }
