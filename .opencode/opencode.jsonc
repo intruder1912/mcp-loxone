@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "loxone": {
+      "type": "local",
+      "command": [
+        "/Users/intruder/devzone/mcp-loxone/target/release/loxone-mcp-server",
+        "stdio"
+      ],
+      "enabled": true,
+      "timeout": 10000,
+      "environment": {
+        "LOXONE_HOST": "{env:LOXONE_HOST}",
+        "LOXONE_USER": "{env:LOXONE_USER}",
+        "LOXONE_PASS": "{env:LOXONE_PASS}"
+      }
+    },
+    "loxone-http": {
+      "type": "remote",
+      "url": "http://localhost:3001/mcp"
+    }
+  }
+}
