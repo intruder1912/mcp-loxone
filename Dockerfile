@@ -3,7 +3,7 @@
 
 # Stage 1: Build the application
 # Rust 1.85+ required for Rust 2024 edition
-FROM rust:1.85-alpine AS builder
+FROM rust:1.94-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -36,7 +36,7 @@ RUN touch src/main.rs src/lib.rs && \
     cargo build --release --bin loxone-mcp-server
 
 # Stage 2: Create minimal runtime image
-FROM alpine:3.19
+FROM alpine:3.21
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -65,7 +65,7 @@ EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["/usr/local/bin/loxone-mcp-server", "http", "--port", "3001", "--api-key", "health-check"] || exit 1
+    CMD pgrep -f loxone-mcp-server || exit 1
 
 # Default command (stdio mode for Claude Desktop)
 # Override with "http" for HTTP/SSE mode

@@ -262,9 +262,7 @@ impl MetricsCollector {
         }
 
         let mut system = self.system.write().await;
-        system.refresh_cpu_usage();
-        system.refresh_memory();
-        system.refresh_processes();
+        system.refresh_all();
 
         // Calculate CPU usage
         let cpu_usage = system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()
@@ -609,8 +607,8 @@ impl Default for MetricsCollector {
 }
 
 /// Global metrics instance (lazy initialized)
-static METRICS: once_cell::sync::Lazy<Arc<MetricsCollector>> =
-    once_cell::sync::Lazy::new(|| Arc::new(MetricsCollector::new()));
+static METRICS: std::sync::LazyLock<Arc<MetricsCollector>> =
+    std::sync::LazyLock::new(|| Arc::new(MetricsCollector::new()));
 
 /// Get global metrics collector
 pub fn get_metrics() -> Arc<MetricsCollector> {

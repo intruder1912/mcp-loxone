@@ -221,14 +221,14 @@ impl RetryPolicy {
 
     /// Apply jitter to delay
     fn apply_jitter(&self, delay: Duration, previous_delay: Option<Duration>) -> Duration {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let delay_ms = delay.num_milliseconds() as f64;
 
         let jittered_ms = match self.jitter.jitter_type {
-            JitterType::Full => rng.gen_range(0.0..=delay_ms * self.jitter.jitter_factor),
+            JitterType::Full => rng.random_range(0.0..=delay_ms * self.jitter.jitter_factor),
             JitterType::Equal => {
                 let half = delay_ms / 2.0;
-                half + rng.gen_range(0.0..=half * self.jitter.jitter_factor)
+                half + rng.random_range(0.0..=half * self.jitter.jitter_factor)
             }
             JitterType::Decorrelated => {
                 let prev_ms = previous_delay
@@ -236,7 +236,7 @@ impl RetryPolicy {
                     .unwrap_or(delay_ms);
                 let min = self.initial_delay.num_milliseconds() as f64;
                 let max = (delay_ms * 3.0).min(self.max_delay.num_milliseconds() as f64);
-                rng.gen_range(min..=max).min(prev_ms * 3.0)
+                rng.random_range(min..=max).min(prev_ms * 3.0)
             }
         };
 

@@ -467,7 +467,8 @@ impl ServerMetricsCollector {
         let process = system.process(current_pid);
 
         // Calculate CPU usage (system global CPU usage)
-        let cpu_usage = system.global_cpu_info().cpu_usage();
+        let cpu_usage = system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()
+            / system.cpus().len().max(1) as f32;
 
         // Get memory information
         let (memory_usage_mb, memory_usage_percent) = if let Some(proc) = process {
